@@ -14,6 +14,8 @@ export interface Settings {
   /** Chosen cosmetics (ids from achievements.ts). */
   skin: string;
   outfit: string;
+  /** Show the ghost of the best run while playing. */
+  ghost: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 0.5,
   skin: 'world',
   outfit: 'red',
+  ghost: true,
 };
 
 export function loadSettings(): Settings {

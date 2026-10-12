@@ -4,7 +4,7 @@ import { icon } from '../icons';
 
 /** Settings: sound, music, motion, and resetting progress (two presses, no browser dialog). */
 export function showSettings(s: Settings, hooks: { change: (s: Settings) => void; reset: () => void; click: () => void }): Promise<void> {
-  const row = (key: 'muted' | 'music' | 'reducedMotion', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
+  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const el = h(
     'div',
@@ -15,6 +15,7 @@ export function showSettings(s: Settings, hooks: { change: (s: Settings) => void
       ${slider('sfxVolume', 'Effects volume')}
       ${row('music', 'Music', s.music)}
       ${slider('musicVolume', 'Music volume')}
+      ${row('ghost', 'Ghost of your best run', s.ghost)}
       ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}
       <button class="big-btn ghost danger" data-reset>${icon('replay', 16)} Reset progress</button>
       <div class="actions"><button class="big-btn primary" data-done>Done</button></div>

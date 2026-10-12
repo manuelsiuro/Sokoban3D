@@ -27,6 +27,7 @@ import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
 import { registerServiceWorker } from './app/pwa';
 import { generateDaily, hint } from './app/helper';
+import { ghostPath, runSolves, type GhostStep } from './game/ghost';
 import { DIRS } from './sim/grid';
 import type { LevelDef } from './levels/types';
 
@@ -102,11 +103,17 @@ function updateHud() {
   setText($('.hud-moves b'), String(s.moves));
   setText($('.hud-moves small'), run?.par ? `/ par ${run.par}` : 'moves');
   $<HTMLButtonElement>('[data-a="undo"]').disabled = sim.frame === 0;
+  if (run?.ghost) view.setGhost(run.ghost[Math.min(s.moves, run.ghost.length - 1)]);
 }
 
 // ------------------------------------------------------------------ playing
 interface Run {
   level: LevelDef;
+  /** The best run's path, shown as a ghost (null: none). */
+  ghost: GhostStep[] | null;
+  /** A replay plays by itself: the player only watches. */
+  watching: boolean;
+  timer: number;
   /** The fewest moves (0: unknown). */
   par: number;
   /** No undo or restart used. */
@@ -124,8 +131,11 @@ let run: Run | null = null;
 /** A campaign level's label: its world and number. */
 const campaignLabel = (level: LevelDef) => `${WORLDS.find((w) => w.id === level.world)?.name ?? ''} · ${LEVELS.filter((l) => l.world === level.world).indexOf(level) + 1}`;
 
-/** Plays a level until it's solved; resolves with the final state (null if the player left). */
-function play(level: LevelDef, label: string, levelPar: number): Promise<RunResult | null> {
+/**
+ * Plays a level until it's solved; resolves with the final state (null if the player left).
+ * `ghost`: a recorded run to show as a ghost; `autoplay`: a run to replay by itself.
+ */
+function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: string; autoplay?: string } = {}): Promise<RunResult | null> {
   showLevel(level);
   mode = 'level';
   view.idle = false;
@@ -137,7 +147,21 @@ function play(level: LevelDef, label: string, levelPar: number): Promise<RunResu
   tipTimer = window.setTimeout(() => tip.classList.add('gone'), 9000);
   hud.classList.remove('hidden');
   return new Promise((resolve) => {
-    run = { level, par: levelPar, clean: true, over: false, done: resolve };
+    const ghost = settings.ghost && opts.ghost && !opts.autoplay && runSolves(level, opts.ghost) ? ghostPath(level, opts.ghost) : null;
+    run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve };
+    hud.classList.toggle('watching', !!opts.autoplay);
+    if (opts.autoplay) {
+      // A replay: one move every quarter second, through the same rules and animations.
+      const moves = opts.autoplay.toLowerCase();
+      let k = 0;
+      const r = run;
+      say('Replay of your best run', 4000);
+      r.timer = window.setInterval(() => {
+        if (run !== r || r.over || k >= moves.length) return clearInterval(r.timer);
+        const prev = shown;
+        if (sim.move(DIRS.indexOf(moves[k++]))) present(prev, true);
+      }, 260);
+    }
     updateHud();
   });
 }
@@ -145,6 +169,8 @@ function play(level: LevelDef, label: string, levelPar: number): Promise<RunResu
 function endRun(state: GameState | null) {
   const r = run;
   if (!r) return;
+  clearInterval(r.timer);
+  view.setGhost(null);
   run = null;
   hud.classList.add('hidden');
   r.done(state ? { state, clean: r.clean } : null);
@@ -182,7 +208,7 @@ function present(prev: GameState, forward: boolean) {
 
 /** A move in a screen direction (0 up, 1 right, 2 down, 3 left). */
 function move(screen: number) {
-  if (!run || run.over) return;
+  if (!run || run.over || run.watching) return;
   const prev = shown;
   if (sim.move(view.screenDir(screen))) present(prev, true);
   else sound.bump();
@@ -200,7 +226,7 @@ function act(a: string) {
     click();
     return;
   }
-  if (run.over) return;
+  if (run.over || run.watching) return;
   if (a === 'hint') {
     askHint();
     return;
@@ -369,16 +395,23 @@ async function shareText(text: string, url?: string): Promise<string> {
 /** Plays from a level on, through Next, until the player leaves; resolves with the last level played. */
 async function levelFlow(index: number): Promise<number> {
   for (;;) {
-    const r = await play(LEVELS[index], campaignLabel(LEVELS[index]), par(index));
+    const level = LEVELS[index];
+    const r = await play(level, campaignLabel(level), par(index), { ghost: loadProgress()[level.id]?.run });
     if (!r) return index;
     const { state: s, clean } = r;
     const p = par(index);
     const stars = starsFor(s.moves, p);
-    const best = saveResult(LEVELS[index].id, stars, s.moves, clean);
+    const best = saveResult(level.id, stars, s.moves, clean, sim.moves);
     const extra = newTrophies();
     // Next stays inside the world; after its last level, back to the map.
-    const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === LEVELS[index].world ? index + 1 : -1;
-    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0, extra }, click);
+    const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === level.world ? index + 1 : -1;
+    let choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0, extra, watch: !!loadProgress()[level.id]?.run }, click);
+    // Watching the best run comes back to the same summary.
+    while (choice === 'watch') {
+      const run = loadProgress()[level.id]?.run;
+      if (run) await play(level, `${campaignLabel(level)} · replay`, p, { autoplay: run });
+      choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best: false, clean, hasNext: next >= 0, extra: '', watch: true }, click);
+    }
     if (choice === 'levels') return index;
     if (choice === 'next') index = next;
   }

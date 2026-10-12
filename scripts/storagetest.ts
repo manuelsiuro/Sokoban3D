@@ -34,6 +34,12 @@ check(p?.stars === 2 && p?.moves === 7 && p?.clean === true, 'best stars, fewest
 check(isUnlocked(2) && !isUnlocked(3), 'a solve opens the next level');
 check(nextLevel() === 2, 'Play leads to the first open level not solved');
 
+// The best run (for the ghost) follows the fewest moves.
+saveResult('meadow-4', 2, 9, false, 'rrrrddddl');
+saveResult('meadow-4', 3, 6, false, 'rDDurD');
+saveResult('meadow-4', 2, 8, false, 'rrrrdddd');
+check(loadProgress()['meadow-4']?.run === 'rDDurD', 'the ghost run is the fewest-moves one');
+
 // Blocked storage: nothing throws, reads fall back.
 blocked = true;
 check(readJSON(KEYS.progress, { ok: true }).ok === true, 'blocked storage falls back');

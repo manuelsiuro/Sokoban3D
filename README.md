@@ -13,6 +13,7 @@ plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](
   Sanctum (gates that flip every move, teleporters). Every par is the solver's proven optimum.
 - **World map** of floating islands; worlds open at 55% of the stars before them.
 - **Stars** against par, a no-undo badge, **hints** from the live solver, free undo/redo.
+- **Ghost** of your best run walks beside you; **Watch best** replays it.
 - **Daily puzzle** (generated from the date, a mechanic per weekday) with a streak and sharing.
 - **Workshop**: paint a level with every mechanic, check it with the solver, play it, share a link.
 - **Trophies** that unlock crate skins and outfits; generated music per world; settings.

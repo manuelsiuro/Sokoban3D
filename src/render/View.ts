@@ -113,6 +113,7 @@ export class View {
     this.crates = [];
     this.goals = [];
     this.wonAt = -1;
+    this.setGhost(null);
     const R = rng(hash(level.id));
     // Sky, fog and light.
     this.scene.background = skyTexture(b.skyTop, b.skyBottom);
@@ -397,6 +398,41 @@ export class View {
     if (!on) this.yaw = Math.round(this.yaw);
   }
 
+  private ghost: THREE.Group | null = null;
+  private ghostTo = new THREE.Vector3();
+  private ghostTurn = 0;
+
+  /**
+   * The ghost of the best run: a see-through pusher standing where that run was after as
+   * many moves as the player has made (null: no ghost). It glides there.
+   */
+  setGhost(step: { cell: number; z: number; facing: number } | null) {
+    if (!step || !this.grid) {
+      if (this.ghost) this.ghost.visible = false;
+      return;
+    }
+    if (!this.ghost) {
+      const g = playerModel().group;
+      const glass = new THREE.MeshStandardMaterial({ color: 0x8fcaff, emissive: 0x3f9bff, emissiveIntensity: 0.6, transparent: true, opacity: 0.5, depthWrite: false, roughness: 0.4 });
+      g.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          o.material = glass;
+          o.castShadow = false;
+          o.receiveShadow = false;
+          o.renderOrder = 2;
+        }
+      });
+      this.ghost = g;
+      this.scene.add(g);
+      this.pos(step.cell, step.z, g.position);
+    }
+    const wasHidden = !this.ghost.visible;
+    this.ghost.visible = true;
+    this.pos(step.cell, step.z, this.ghostTo);
+    if (wasHidden) this.ghost.position.copy(this.ghostTo);
+    this.ghostTurn = ((6 - step.facing) % 4) * (Math.PI / 2);
+  }
+
   private hintArrow: THREE.Group | null = null;
   private hintDir = 0;
 
@@ -528,6 +564,12 @@ export class View {
       });
     }
     this.mech?.update(time, dt);
+    if (this.ghost?.visible) {
+      this.ghost.position.lerp(this.ghostTo, Math.min(1, dt * 14));
+      let d = this.ghostTurn - this.ghost.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.ghost.rotation.y += d * Math.min(1, dt * 12);
+    }
     if (this.hintArrow?.visible && this.state) {
       const at = this.pos(this.state.cell, this.state.z);
       const bob = 0.55 + Math.sin(time * 6) * 0.08;

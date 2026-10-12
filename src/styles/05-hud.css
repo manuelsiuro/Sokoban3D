@@ -182,3 +182,10 @@
     text-align: left;
   }
 }
+
+/* A replay plays by itself: no controls, just the way back. */
+.hud.watching .hud-bar,
+.hud.watching .dpad,
+.hud.watching .hud-keys {
+  display: none;
+}

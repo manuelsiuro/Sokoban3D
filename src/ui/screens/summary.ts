@@ -1,7 +1,7 @@
 import { h } from '../dom';
 import { icon } from '../icons';
 
-export type SummaryChoice = 'retry' | 'next' | 'levels';
+export type SummaryChoice = 'retry' | 'next' | 'levels' | 'watch';
 
 export interface SummaryInfo {
   stars: number;
@@ -17,6 +17,8 @@ export interface SummaryInfo {
   extra?: string;
   /** Shares the result; resolves with what to say ("Copied!"). */
   share?: () => Promise<string>;
+  /** Offer to watch the best run. */
+  watch?: boolean;
 }
 
 /** A solved level: stars, moves against par, and what to do next. */
@@ -33,6 +35,7 @@ export function showSummary(r: SummaryInfo, click: () => void): Promise<SummaryC
       ${r.extra ? `<p class="summary-extra">${r.extra}</p>` : ''}
       <div class="actions">
         <button class="big-btn ghost" data-c="levels" aria-label="Levels">${icon('home', 18)}</button>
+        ${r.watch ? `<button class="big-btn ghost" data-c="watch" aria-label="Watch your best run">${icon('play', 18)} Watch best</button>` : ''}
         ${r.share ? `<button class="big-btn ghost" data-share>${icon('map', 18)} Share</button>` : ''}
         <button class="big-btn ${r.hasNext ? 'ghost' : 'primary'}" data-c="retry">${icon('replay', 18)} Retry</button>
         ${r.hasNext ? `<button class="big-btn primary" data-c="next">Next ${icon('chevronRight', 18)}</button>` : ''}

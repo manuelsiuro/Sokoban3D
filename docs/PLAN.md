@@ -76,4 +76,4 @@ it with earlier ones, the last one is a showpiece.
 - v0.3–v0.8 Phase 3: Tundra, Desert (+ hints), Sky, Forge, Crystal, Clockwork.
 - Phase 4: hints, daily puzzle with streaks, workshop with share links, trophies and
   cosmetics, generated music, settings.
-- Not done: ghost replays of best runs, a GitHub remote and Pages deploy.
+- v0.10: ghost of the best run, replays (Watch best); GitHub remote and Pages deploy.

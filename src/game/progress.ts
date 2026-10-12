@@ -8,6 +8,8 @@ export interface LevelProgress {
   moves: number;
   /** Solved once without undo or restart. */
   clean?: boolean;
+  /** The moves of the best solve (LURD), for the ghost and replays. */
+  run?: string;
 }
 
 export type Progress = Record<string, LevelProgress>;
@@ -16,15 +18,19 @@ export function loadProgress(): Progress {
   return readJSON<Progress>(KEYS.progress, {});
 }
 
-/** Keeps the best of each: stars, moves, the clean badge. Returns true for a new best. */
-export function saveResult(id: string, stars: number, moves: number, clean: boolean): boolean {
+/** Keeps the best of each: stars, moves (with that run's moves), the clean badge. Returns true for a new best. */
+export function saveResult(id: string, stars: number, moves: number, clean: boolean, run?: string): boolean {
   const all = loadProgress();
   const old = all[id];
   const better = !old || stars > old.stars || old.moves === 0 || moves < old.moves;
+  const fewer = !old || old.moves === 0 || moves < old.moves;
+  // The fewest-moves run; a save from before runs were kept takes the first run it gets.
+  const keepRun = fewer || !old?.run ? run : old.run;
   all[id] = {
     stars: Math.max(stars, old?.stars ?? 0),
     moves: old && old.moves > 0 ? Math.min(old.moves, moves) : moves,
     ...(clean || old?.clean ? { clean: true } : {}),
+    ...(keepRun ? { run: keepRun } : {}),
   };
   writeJSON(KEYS.progress, all);
   return better;
