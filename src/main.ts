@@ -25,6 +25,8 @@ import { showSummary } from './ui/screens/summary';
 import { newDraft, showEditor, type Draft } from './ui/screens/editor';
 import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
+import { showUpdate } from './ui/screens/update';
+import { installKind, promptInstall } from './app/install';
 import { registerServiceWorker } from './app/pwa';
 import { generateDaily, hint } from './app/helper';
 import { ghostPath, runSolves, type GhostStep } from './game/ghost';
@@ -148,6 +150,7 @@ function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: 
   hud.classList.remove('hidden');
   return new Promise((resolve) => {
     const ghost = settings.ghost && opts.ghost && !opts.autoplay && runSolves(level, opts.ghost) ? ghostPath(level, opts.ghost) : null;
+    document.body.classList.add('is-playing');
     run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve };
     hud.classList.toggle('watching', !!opts.autoplay);
     if (opts.autoplay) {
@@ -171,6 +174,7 @@ function endRun(state: GameState | null) {
   if (!r) return;
   clearInterval(r.timer);
   view.setGhost(null);
+  document.body.classList.remove('is-playing');
   run = null;
   hud.classList.add('hidden');
   r.done(state ? { state, clean: r.clean } : null);
@@ -570,6 +574,8 @@ async function titleFlow() {
           view.reducedMotion = s.reducedMotion;
         },
         reset: () => resetProgress(),
+        install: installKind(),
+        promptInstall,
         click,
       });
   }
@@ -582,8 +588,11 @@ const devLevel = import.meta.env.DEV ? LEVELS.findIndex((l) => l.id === new URLS
 if (shared) sharedFlow(shared.level, shared.par).then(titleFlow);
 else if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
 else titleFlow();
+// Installed app: offline, and a new version found while the game is open is offered once no
+// level is being played (the same system as Line Rider 3D).
+registerServiceWorker((version, restart) => showUpdate(version, restart));
+
 // A share link opened while the game runs (only the hash changed): start over with it.
 addEventListener('hashchange', () => {
   if (location.hash.startsWith('#lvl=')) location.reload();
 });
-registerServiceWorker(() => {});

@@ -229,3 +229,93 @@ input:focus-visible + .switch {
   font-weight: 600;
   color: #b57a12;
 }
+
+/* "A new version is ready" (the same banner as Line Rider 3D). */
+.update-banner {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 8px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 10px 10px 10px 12px;
+  border-radius: 18px;
+  color: white;
+  background: linear-gradient(135deg, rgba(36, 44, 74, 0.96), rgba(42, 95, 184, 0.96));
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transform: translateX(-50%);
+  animation: update-in 0.5s var(--spring);
+}
+
+.update-banner.leaving {
+  animation: update-out 0.3s var(--ease) forwards;
+}
+
+.update-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.update-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.update-text b {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.update-text small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.update-banner .small-btn {
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+.update-banner .icon-btn.flat {
+  width: 36px;
+  height: 36px;
+  color: white;
+  background: transparent;
+  box-shadow: none;
+}
+
+@keyframes update-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 24px);
+  }
+}
+
+@keyframes update-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, 24px);
+  }
+}
+
+@media (max-width: 480px) {
+  .update-text small {
+    display: none;
+  }
+}
+
+.install-note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
