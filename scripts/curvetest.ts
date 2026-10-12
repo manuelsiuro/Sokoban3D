@@ -2,6 +2,7 @@
 import { LEVELS } from '../src/levels/levels';
 import { WORLDS } from '../src/levels/worlds';
 import { check } from './assert';
+import { worldGate } from '../src/game/progress';
 
 const ids = new Set<string>();
 const order = WORLDS.map((w) => w.id);
@@ -19,7 +20,7 @@ for (const l of LEVELS) {
   d = l.difficulty;
   check(l.tip.length > 0, `${l.id}: a tip`);
 }
-for (const w of WORLDS) {
+WORLDS.forEach((w, k) => {
   const ls = LEVELS.filter((l) => l.world === w.id);
-  console.log(`${w.id.padEnd(10)} ${String(ls.length).padStart(2)} levels  difficulty ${ls.map((l) => l.difficulty).join(' ') || '-'}`);
-}
+  console.log(`${w.id.padEnd(10)} ${String(ls.length).padStart(2)} levels  opens at ${String(worldGate(k)).padStart(3)} stars  difficulty ${ls.map((l) => l.difficulty).join(' ') || '-'}`);
+});

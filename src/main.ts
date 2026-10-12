@@ -5,15 +5,16 @@ import { LEVELS } from './levels/levels';
 import { SOLUTIONS } from './levels/solutions';
 import { WORLDS } from './levels/worlds';
 import { View } from './render/View';
+import { MapView } from './render/MapView';
 import { Sound } from './audio/Sound';
 import { loadSettings, saveSettings } from './game/settings';
 import { migrateStorage } from './game/storage';
-import { isUnlocked, loadProgress, nextLevel, saveResult, totalStars } from './game/progress';
+import { isUnlocked, isWorldOpen, loadProgress, nextLevel, saveResult, totalStars, worldGate, worldLevels, worldStars } from './game/progress';
 import { starLimits, starsFor } from './game/score';
 import { TOUCH, h, setText } from './ui/dom';
 import { icon } from './ui/icons';
 import { showTitle } from './ui/screens/title';
-import { showLevels } from './ui/screens/levels';
+import { showWorlds } from './ui/screens/worlds';
 import { showSummary } from './ui/screens/summary';
 import { registerServiceWorker } from './app/pwa';
 
@@ -35,6 +36,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.append(renderer.domElement);
 const view = new View(renderer);
 view.reducedMotion = settings.reducedMotion;
+const map = new MapView(renderer, WORLDS);
+addEventListener('resize', () => map.resize());
+map.resize();
+/** Which scene the frame loop draws. */
+let mode: 'level' | 'map' = 'level';
 
 /** The level on screen (also behind the menus). */
 let sim = new Sim(LEVELS[0]);
@@ -99,6 +105,7 @@ let run: Run | null = null;
 /** Plays a level until it's solved; resolves with the final state (null if the player left). */
 function play(index: number): Promise<RunResult | null> {
   showLevel(index);
+  mode = 'level';
   view.idle = false;
   const level = LEVELS[index];
   const world = WORLDS.find((w) => w.id === level.world);
@@ -260,36 +267,58 @@ renderer.domElement.addEventListener('pointercancel', endSwipe);
 
 function frame(now: number) {
   requestAnimationFrame(frame);
-  view.draw(now / 1000);
+  if (mode === 'map') map.draw(now / 1000);
+  else view.draw(now / 1000);
 }
 requestAnimationFrame(frame);
 
 // ------------------------------------------------------------------ flows
-async function levelFlow(index: number): Promise<void> {
+const worldIndex = (levelIndex: number) => WORLDS.findIndex((w) => w.id === LEVELS[levelIndex].world);
+
+/** Plays from a level on, through Next, until the player leaves; resolves with the last level played. */
+async function levelFlow(index: number): Promise<number> {
   for (;;) {
     const r = await play(index);
-    if (!r) return;
+    if (!r) return index;
     const { state: s, clean } = r;
     const p = par(index);
     const stars = starsFor(s.moves, p);
     const best = saveResult(LEVELS[index].id, stars, s.moves, clean);
-    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: index + 1 < LEVELS.length }, click);
-    if (choice === 'levels') return;
-    if (choice === 'next') index++;
+    // Next stays inside the world; after its last level, back to the map.
+    const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === LEVELS[index].world ? index + 1 : -1;
+    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0 }, click);
+    if (choice === 'levels') return index;
+    if (choice === 'next') index = next;
   }
 }
-async function pickLevel(): Promise<number | null> {
-  const p = loadProgress();
-  return showLevels(
-    WORLDS.map((w) => ({
-      name: w.name,
-      mechanic: w.mechanic,
-      levels: LEVELS.map((l, i) => ({ l, i }))
-        .filter(({ l }) => l.world === w.id)
-        .map(({ l, i }) => ({ index: i, name: l.name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
-    })),
-    click,
-  );
+
+/** The world map: pick a world and a level, play, come back to the same world. */
+async function worldsFlow(start: number) {
+  let at = { world: start, sheet: false };
+  for (;;) {
+    const p = loadProgress();
+    mode = 'map';
+    map.setLocked(WORLDS.map((_, k) => !isWorldOpen(k, p)));
+    const total = totalStars(p);
+    const cards = WORLDS.map((w, k) => {
+      const levels = worldLevels(w.id);
+      return {
+        name: w.name,
+        mechanic: w.mechanic,
+        stars: worldStars(w.id, p),
+        maxStars: levels.length * 3,
+        open: isWorldOpen(k, p),
+        missing: Math.max(0, worldGate(k) - total),
+        gate: worldGate(k),
+        soon: levels.length === 0,
+        levels: levels.map(({ l, i }) => ({ index: i, name: l.name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
+      };
+    });
+    const i = await showWorlds(cards, at, { select: (k) => map.select(k), pick: (x, y) => map.pick(x, y) }, click);
+    if (i === null) return;
+    const last = await levelFlow(i);
+    at = { world: worldIndex(last), sheet: true };
+  }
 }
 
 async function titleFlow() {
@@ -297,6 +326,7 @@ async function titleFlow() {
     const p = loadProgress();
     const next = nextLevel(p);
     showLevel(next ?? 0);
+    mode = 'level';
     view.idle = true;
     const choice = await showTitle(
       {
@@ -304,6 +334,8 @@ async function titleFlow() {
         maxStars: LEVELS.length * 3,
         solved: LEVELS.filter((l) => (p[l.id]?.stars ?? 0) > 0).length,
         levels: LEVELS.length,
+        worlds: WORLDS.length,
+        worldsOpen: WORLDS.filter((_, k) => isWorldOpen(k, p)).length,
         next: next === null ? null : { name: LEVELS[next].name, number: next + 1 },
         fresh: Object.keys(p).length === 0,
         muted: settings.muted,
@@ -320,11 +352,7 @@ async function titleFlow() {
       await levelFlow(next ?? 0);
       continue;
     }
-    for (;;) {
-      const i = await pickLevel();
-      if (i === null) break;
-      await levelFlow(i);
-    }
+    await worldsFlow(next === null ? 0 : worldIndex(next));
   }
 }
 

@@ -1,13 +1,15 @@
 import { h } from '../dom';
 import { icon } from '../icons';
 
-export type TitleChoice = 'play' | 'levels';
+export type TitleChoice = 'play' | 'worlds';
 
 export interface TitleInfo {
   stars: number;
   maxStars: number;
   solved: number;
   levels: number;
+  worlds: number;
+  worldsOpen: number;
   /** The next level to play (name and number), or null when every level is solved. */
   next: { name: string; number: number } | null;
   fresh: boolean;
@@ -35,9 +37,9 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           <span class="hero-text"><b>${info.next && !info.fresh ? 'Continue' : 'Play'}</b><small>${sub}</small></span>
           <span class="pill">${icon('star', 14)} ${info.stars}/${info.maxStars}</span>
         </button>
-        <button class="menu-btn" data-c="levels" style="--tone:#4fae4a;--tone-2:#2f8a3a;--done:${done}%">
-          <span class="menu-ic">${icon('trophy', 18)}</span>
-          <span class="menu-text"><span class="menu-label">Levels</span><small>${info.solved}/${info.levels} solved · ${icon('star', 12)} ${info.stars}/${info.maxStars}</small></span>
+        <button class="menu-btn" data-c="worlds" style="--tone:#4fae4a;--tone-2:#2f8a3a;--done:${done}%">
+          <span class="menu-ic">${icon('map', 18)}</span>
+          <span class="menu-text"><span class="menu-label">Worlds</span><small>${info.worldsOpen}/${info.worlds} open · ${info.solved}/${info.levels} solved</small></span>
           ${icon('chevronRight', 16)}<i class="menu-bar"></i>
         </button>
       </div>

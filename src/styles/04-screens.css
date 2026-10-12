@@ -187,29 +187,3 @@
   }
 }
 
-/* World sections in the level list. */
-.world-section {
-  margin-bottom: 26px;
-}
-
-.world-section h3 {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 12px;
-  font: 700 24px var(--font-display);
-}
-
-.world-section h3 small {
-  font: 500 14px var(--font-ui);
-  color: var(--ink-soft);
-}
-
-.world-soon {
-  margin: 0;
-  padding: 14px 16px;
-  border-radius: 16px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.5);
-}

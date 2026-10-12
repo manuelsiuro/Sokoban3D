@@ -1,5 +1,3 @@
-import { LEVELS } from './levels';
-
 /** The campaign's worlds in order. A world with no levels yet shows as "coming soon". */
 export interface WorldDef {
   id: string;
@@ -17,5 +15,3 @@ export const WORLDS: WorldDef[] = [
   { id: 'crystal', name: 'Crystal Caverns', mechanic: 'Colors and lasers' },
   { id: 'clockwork', name: 'Clockwork Sanctum', mechanic: 'Flipping gates, teleporters' },
 ];
-
-export const levelsOf = (world: string) => LEVELS.filter((l) => l.world === world);

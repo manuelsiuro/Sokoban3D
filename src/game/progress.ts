@@ -1,4 +1,5 @@
 import { LEVELS } from '../levels/levels';
+import { WORLDS } from '../levels/worlds';
 import { KEYS, readJSON, writeJSON } from './storage';
 
 export interface LevelProgress {
@@ -9,8 +10,10 @@ export interface LevelProgress {
   clean?: boolean;
 }
 
-export function loadProgress(): Record<string, LevelProgress> {
-  return readJSON<Record<string, LevelProgress>>(KEYS.progress, {});
+export type Progress = Record<string, LevelProgress>;
+
+export function loadProgress(): Progress {
+  return readJSON<Progress>(KEYS.progress, {});
 }
 
 /** Keeps the best of each: stars, moves, the clean badge. Returns true for a new best. */
@@ -27,17 +30,44 @@ export function saveResult(id: string, stars: number, moves: number, clean: bool
   return better;
 }
 
-export const totalStars = (p = loadProgress()) => Object.values(p).reduce((n, r) => n + (r?.stars ?? 0), 0);
+const starsOf = (p: Progress, id: string) => p[id]?.stars ?? 0;
+export const totalStars = (p = loadProgress()) => LEVELS.reduce((n, l) => n + starsOf(p, l.id), 0);
+export const worldLevels = (world: string) => LEVELS.map((l, i) => ({ l, i })).filter(({ l }) => l.world === world);
+export const worldStars = (world: string, p = loadProgress()) => worldLevels(world).reduce((n, { l }) => n + starsOf(p, l.id), 0);
 
-/** A level opens once the previous one is solved (the first is always open). Solved levels stay open. */
-export function isUnlocked(index: number, p = loadProgress()) {
-  if (index <= 0) return true;
-  if ((p[LEVELS[index]?.id]?.stars ?? 0) > 0) return true;
-  return (p[LEVELS[index - 1]?.id]?.stars ?? 0) > 0;
+/** The share of the stars before a world needed to open it. */
+export const GATE = 0.55;
+
+/** Stars needed to open a world: 55% of all the stars in the worlds before it. */
+export function worldGate(index: number) {
+  const before = WORLDS.slice(0, index).reduce((n, w) => n + worldLevels(w.id).length * 3, 0);
+  return Math.ceil(before * GATE);
 }
 
-/** The level Play leads to: the first open one not yet solved (null when all are solved). */
+/**
+ * A world opens at its star gate, and stays open once a level in it has a star (so a
+ * changed gate never locks a world already played in). Worlds without levels stay shut.
+ */
+export function isWorldOpen(index: number, p = loadProgress()) {
+  const w = WORLDS[index];
+  if (!w || worldLevels(w.id).length === 0) return false;
+  if (index === 0 || worldStars(w.id, p) > 0) return true;
+  return totalStars(p) >= worldGate(index);
+}
+
+/** A level opens with its world, once the one before it in the world is solved. Solved levels stay open. */
+export function isUnlocked(index: number, p = loadProgress()) {
+  const level = LEVELS[index];
+  if (!level) return false;
+  if (starsOf(p, level.id) > 0) return true;
+  if (!isWorldOpen(WORLDS.findIndex((w) => w.id === level.world), p)) return false;
+  const inWorld = worldLevels(level.world);
+  const k = inWorld.findIndex(({ i }) => i === index);
+  return k === 0 || starsOf(p, inWorld[k - 1].l.id) > 0;
+}
+
+/** The level Play leads to: the first open one not yet solved (null when all open ones are solved). */
 export function nextLevel(p = loadProgress()) {
-  const i = LEVELS.findIndex((l, k) => isUnlocked(k, p) && !(p[l.id]?.stars ?? 0));
+  const i = LEVELS.findIndex((l, k) => isUnlocked(k, p) && !starsOf(p, l.id));
   return i < 0 ? null : i;
 }

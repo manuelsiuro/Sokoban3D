@@ -1,0 +1,197 @@
+/* ------------------------------------------------------------ world map overlay */
+.worlds {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  animation: fade 0.3s var(--ease);
+}
+
+.worlds.leaving {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.worlds button,
+.worlds .sheet {
+  pointer-events: auto;
+}
+
+.worlds-head {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(14px, env(safe-area-inset-left));
+  right: max(14px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.worlds-head h2 {
+  flex: 1;
+  margin: 0;
+  font: 700 clamp(28px, 6vw, 40px) var(--font-display);
+  color: white;
+  text-shadow: 0 2px 10px rgba(20, 40, 80, 0.35);
+}
+
+.world-card {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.world-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 18px 18px;
+  border-radius: 24px;
+  text-align: center;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+.world-info small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.world-info b {
+  font: 700 26px var(--font-display);
+}
+
+.world-info > span {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.world-info .big-btn {
+  margin-top: 8px;
+}
+
+.world-stars,
+.world-lock {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 12px 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.world-stars .ic {
+  color: #f2a51f;
+  fill: #ffd34d;
+}
+
+.world-stars i,
+.world-lock i {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) var(--done, 0%), rgba(18, 35, 58, 0.12) 0);
+}
+
+.world-lock {
+  color: var(--ink-soft);
+}
+
+.world-card > .icon-btn {
+  pointer-events: auto;
+}
+
+.world-card > .icon-btn[disabled] {
+  opacity: 0.35;
+}
+
+/* The level sheet: up from the bottom, the map stays visible above it. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 18px max(16px, env(safe-area-inset-left)) max(18px, env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  background: rgba(240, 246, 252, 0.94);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -10px 40px -10px rgba(20, 50, 90, 0.35);
+  animation: sheet-up 0.35s var(--ease);
+}
+
+.sheet.hidden {
+  display: none;
+}
+
+.sheet-inner {
+  width: min(880px, 100%);
+  margin: 0 auto;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sheet-head h3 {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  font: 700 26px var(--font-display);
+}
+
+.sheet-head h3 small {
+  font: 500 14px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+/* Phone landscape: the sheet takes the full height. */
+@media (max-height: 480px) {
+  .sheet {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .world-info {
+    padding: 10px 14px 12px;
+  }
+  .world-info b {
+    font-size: 21px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}

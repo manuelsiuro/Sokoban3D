@@ -5,6 +5,7 @@ import { DX, DY, VOID, type Grid } from '../sim/grid';
 import { EVENT, type GameState } from '../sim/Sim';
 import { rng } from '../sim/rng';
 import { biomeOf, type Biome } from '../world/biomes';
+import { skyTexture } from './sky';
 import { CRATE, crateModel, decorModel, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
 
 /** World height of one level (a crate's height, so a crate in a dip is flush with the floor). */
@@ -464,20 +465,4 @@ export class View {
     const lift = this.camera.aspect < 1 ? 0.9 : 0;
     this.camera.lookAt(this.center.x + Math.sin(a) * lift, this.center.y - 0.3, this.center.z + Math.cos(a) * lift);
   }
-}
-
-/** A vertical gradient for the sky (drawn behind everything). */
-function skyTexture(top: number, bottom: number) {
-  const c = document.createElement('canvas');
-  c.width = 2;
-  c.height = 256;
-  const ctx = c.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, `#${top.toString(16).padStart(6, '0')}`);
-  g.addColorStop(1, `#${bottom.toString(16).padStart(6, '0')}`);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 2, 256);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }
