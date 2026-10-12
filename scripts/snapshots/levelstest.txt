@@ -58,3 +58,13 @@ OK   crystal-7      par  31 pushes  11 crates 3  ★★ ≤46 ★★★ ≤34
 OK   crystal-8      par  39 pushes  10 crates 3  ★★ ≤58 ★★★ ≤42
 OK   crystal-9      par  46 pushes  20 crates 3  ★★ ≤69 ★★★ ≤50
 OK   crystal-10     par  41 pushes  11 crates 3  ★★ ≤61 ★★★ ≤45
+OK   clockwork-1    par  10 pushes   5 crates 1  ★★ ≤15 ★★★ ≤11
+OK   clockwork-2    par  15 pushes   5 crates 1  ★★ ≤22 ★★★ ≤16
+OK   clockwork-3    par  26 pushes   8 crates 2  ★★ ≤39 ★★★ ≤28
+OK   clockwork-4    par  19 pushes  10 crates 2  ★★ ≤28 ★★★ ≤20
+OK   clockwork-5    par  34 pushes  13 crates 2  ★★ ≤51 ★★★ ≤37
+OK   clockwork-6    par  35 pushes  13 crates 2  ★★ ≤52 ★★★ ≤38
+OK   clockwork-7    par  49 pushes  19 crates 3  ★★ ≤73 ★★★ ≤53
+OK   clockwork-8    par  41 pushes  14 crates 3  ★★ ≤61 ★★★ ≤45
+OK   clockwork-9    par  43 pushes  17 crates 3  ★★ ≤64 ★★★ ≤47
+OK   clockwork-10   par  76 pushes  23 crates 3  ★★ ≤114 ★★★ ≤83

@@ -7,6 +7,7 @@ import { check } from './assert';
 
 for (const level of LEVELS) {
   const stored = SOLUTIONS[level.id];
+  check(stored !== undefined, `${level.id}: no stored solution (run scripts/dev/solveall.ts)`);
   if (stored === undefined) continue;
   const r = solve(parseLevel(level), { maxDepth: stored.length - 1, maxStates: 8_000_000 });
   check(r.solution === null && r.complete, `${level.id}: ${r.solution !== null ? `a shorter solution exists (${r.solution.length})` : 'search too big to prove par'}`);
