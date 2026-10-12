@@ -273,3 +273,57 @@ body.touch .title-foot > span {
   width: 36px;
   height: 36px;
 }
+
+/* Install app: the game's own install offer (Chrome's is held back for it). */
+.install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font: 700 13px var(--font-ui);
+  color: white;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  box-shadow: var(--shadow);
+}
+
+.install-btn.hidden {
+  display: none;
+}
+
+/* The steps for iPhone and iPad (Safari's share sheet). */
+.install-steps {
+  margin: 14px 0 18px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  counter-reset: step;
+}
+
+.install-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  font-weight: 600;
+  counter-increment: step;
+}
+
+.install-steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font: 700 14px var(--font-display);
+  color: white;
+  background: var(--accent);
+}
+
+.install-steps .ic {
+  display: inline-block;
+  vertical-align: -4px;
+  color: var(--accent);
+}

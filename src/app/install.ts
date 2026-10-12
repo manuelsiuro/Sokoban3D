@@ -9,11 +9,25 @@ interface InstallPrompt extends Event {
 }
 
 let deferred: InstallPrompt | null = null;
+const listeners = new Set<() => void>();
+const changed = () => listeners.forEach((f) => f());
+// The browser's own install offer is held back so the game can offer it on its title
+// screen (which must then show it: see onInstallChange).
 addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferred = e as InstallPrompt;
+  changed();
 });
-addEventListener('appinstalled', () => (deferred = null));
+addEventListener('appinstalled', () => {
+  deferred = null;
+  changed();
+});
+
+/** Calls back when installing becomes possible (the browser's offer often comes a moment after load) or is done. */
+export function onInstallChange(f: () => void) {
+  listeners.add(f);
+  return () => listeners.delete(f);
+}
 
 export const isInstalled = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
@@ -30,6 +44,7 @@ export async function promptInstall(): Promise<boolean> {
   if (!deferred) return false;
   const p = deferred;
   deferred = null;
+  changed();
   await p.prompt();
   return (await p.userChoice).outcome === 'accepted';
 }

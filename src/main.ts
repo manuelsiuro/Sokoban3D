@@ -27,6 +27,7 @@ import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
 import { showUpdate } from './ui/screens/update';
 import { installKind, promptInstall } from './app/install';
+import { showInstallHelp } from './ui/screens/installHelp';
 import { registerServiceWorker } from './app/pwa';
 import { generateDaily, hint } from './app/helper';
 import { ghostPath, runSolves, type GhostStep } from './game/ghost';
@@ -555,6 +556,10 @@ async function titleFlow() {
     else if (choice === 'worlds') await worldsFlow(next === null ? 0 : worldIndex(next));
     else if (choice === 'daily') await dailyFlow();
     else if (choice === 'workshop') await workshopFlow();
+    else if (choice === 'install') {
+      if (installKind() === 'prompt') await promptInstall();
+      else await showInstallHelp(click);
+    }
     else if (choice === 'trophies') {
       const { skins, outfits } = unlockedCosmetics(have);
       await showTrophies({ progress: p, daily: loadDaily(), built: builtOne() }, have, { skins, outfits }, { skin: settings.skin, outfit: settings.outfit }, {
@@ -576,6 +581,7 @@ async function titleFlow() {
         reset: () => resetProgress(),
         install: installKind(),
         promptInstall,
+        installHelp: () => showInstallHelp(click),
         click,
       });
   }

@@ -1,7 +1,8 @@
 import { h } from '../dom';
 import { icon } from '../icons';
+import { installKind, onInstallChange } from '../../app/install';
 
-export type TitleChoice = 'play' | 'worlds' | 'daily' | 'workshop' | 'trophies' | 'settings';
+export type TitleChoice = 'play' | 'worlds' | 'daily' | 'workshop' | 'trophies' | 'settings' | 'install';
 
 export interface TitleInfo {
   stars: number;
@@ -62,10 +63,15 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           </button>
         </div>
       </div>
-      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><span class="keys-hint">Arrows or WASD to move · Z undo · Q/E turn</span></div>
+      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>Install app</span></button><span class="keys-hint">Arrows or WASD to move · Z undo · Q/E turn</span></div>
     </div>
     <span class="title-version">v${__APP_VERSION__}</span>`,
   );
+  // Install app: shown while the game can be installed here (the offer may arrive later).
+  const installBtn = el.querySelector<HTMLElement>('.install-btn')!;
+  const showInstall = () => installBtn.classList.toggle('hidden', installKind() === null);
+  showInstall();
+  const stopWatching = onInstallChange(showInstall);
   return new Promise((resolve) => {
     el.onclick = (e) => {
       const t = e.target as HTMLElement;
@@ -80,6 +86,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
       const c = t.closest<HTMLElement>('[data-c]')?.dataset.c as TitleChoice | undefined;
       if (!c) return;
       click();
+      stopWatching();
       el.remove();
       resolve(c);
     };
