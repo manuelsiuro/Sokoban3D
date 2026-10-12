@@ -18,3 +18,13 @@ OK   tundra-7       par  41 pushes  14 crates 3  ★★ ≤61 ★★★ ≤45
 OK   tundra-8       par  39 pushes  13 crates 3  ★★ ≤58 ★★★ ≤42
 OK   tundra-9       par  73 pushes  19 crates 3  ★★ ≤109 ★★★ ≤80
 OK   tundra-10      par  63 pushes  18 crates 4  ★★ ≤94 ★★★ ≤69
+OK   desert-1       par   9 pushes   5 crates 2  ★★ ≤13 ★★★ ≤9
+OK   desert-2       par  17 pushes   8 crates 2  ★★ ≤25 ★★★ ≤18
+OK   desert-3       par  25 pushes  13 crates 3  ★★ ≤37 ★★★ ≤27
+OK   desert-4       par  28 pushes  10 crates 3  ★★ ≤42 ★★★ ≤30
+OK   desert-5       par  35 pushes  15 crates 4  ★★ ≤52 ★★★ ≤38
+OK   desert-6       par  38 pushes  14 crates 4  ★★ ≤57 ★★★ ≤41
+OK   desert-7       par  39 pushes  14 crates 4  ★★ ≤58 ★★★ ≤42
+OK   desert-8       par  36 pushes  14 crates 5  ★★ ≤54 ★★★ ≤39
+OK   desert-9       par  39 pushes  15 crates 5  ★★ ≤58 ★★★ ≤42
+OK   desert-10      par  58 pushes  28 crates 6  ★★ ≤87 ★★★ ≤63

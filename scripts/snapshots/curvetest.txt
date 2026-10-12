@@ -1,7 +1,7 @@
 meadow     10 levels  opens at   0 stars  difficulty 1 1 1 2 2 2 3 3 4 4
 tundra     10 levels  opens at  17 stars  difficulty 1 1 2 2 3 3 3 4 4 5
-desert      0 levels  opens at  33 stars  difficulty -
-sky         0 levels  opens at  33 stars  difficulty -
-forge       0 levels  opens at  33 stars  difficulty -
-crystal     0 levels  opens at  33 stars  difficulty -
-clockwork   0 levels  opens at  33 stars  difficulty -
+desert     10 levels  opens at  33 stars  difficulty 1 1 2 2 3 3 3 4 4 5
+sky         0 levels  opens at  50 stars  difficulty -
+forge       0 levels  opens at  50 stars  difficulty -
+crystal     0 levels  opens at  50 stars  difficulty -
+clockwork   0 levels  opens at  50 stars  difficulty -

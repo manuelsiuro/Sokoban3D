@@ -34,7 +34,7 @@ export function tileColor(g: Grid, cell: number): { color: number; opts: Paramet
     case TILE.ice:
       return { color: 0x7cc8ef, opts: { rough: 0.05, metal: 0.2 } };
     case TILE.pit:
-      return { color: 0xc59a5e, opts: { rough: 1 } };
+      return { color: 0x9c7442, opts: { rough: 1 } };
     case TILE.lava:
       return { color: 0xff6a1a, opts: { rough: 0.5, emissive: 0xff4a10, emissiveIntensity: 1.2 } };
     case TILE.conveyor:
@@ -129,8 +129,8 @@ export class Mechanics {
             arm.rotation.y = s * 0.7;
             chev.add(arm);
           }
-          // Point along the belt: the chevron's tip is at -z.
-          chev.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir];
+          // Point along the belt: the chevron's tip is at +z (south) unturned.
+          chev.rotation.y = [Math.PI, Math.PI / 2, 0, -Math.PI / 2][dir];
           const base = at.clone().add(new THREE.Vector3(0, 0.02, 0));
           this.chevrons.push({ m: chev, base, dir });
           this.group.add(chev);

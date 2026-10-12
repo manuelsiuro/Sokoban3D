@@ -17,6 +17,8 @@ import { showTitle } from './ui/screens/title';
 import { showWorlds } from './ui/screens/worlds';
 import { showSummary } from './ui/screens/summary';
 import { registerServiceWorker } from './app/pwa';
+import { hint } from './app/helper';
+import { DIRS } from './sim/grid';
 
 /**
  * Wiring: storage first, then the long-lived objects, then the flows between screens.
@@ -64,6 +66,7 @@ const hud = h(
    <div class="hud-bar">
      <button class="icon-btn" data-a="undo" aria-label="Undo (Z)">${icon('undo')}</button>
      <button class="icon-btn" data-a="restart" aria-label="Restart (R)">${icon('replay')}</button>
+     <button class="icon-btn" data-a="hint" aria-label="Hint (H)">${icon('bulb')}</button>
      <span class="sep"></span>
      <button class="icon-btn" data-a="left" aria-label="Turn the camera (Q)">${icon('rotateLeft')}</button>
      <button class="icon-btn" data-a="right" aria-label="Turn the camera (E)">${icon('rotateRight')}</button>
@@ -72,7 +75,7 @@ const hud = h(
    ${
      TOUCH
        ? `<div class="dpad">${[0, 1, 2, 3].map((d) => `<button data-d="${d}" aria-label="${['Up', 'Right', 'Down', 'Left'][d]}">${icon(['up', 'chevronRight', 'down', 'chevronLeft'][d], 26)}</button>`).join('')}</div>`
-       : '<div class="hud-keys"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> move<br><kbd>Z</kbd> undo · <kbd>Y</kbd> redo · <kbd>R</kbd> restart<br><kbd>Q</kbd> <kbd>E</kbd> turn the camera</div>'
+       : '<div class="hud-keys"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> move<br><kbd>Z</kbd> undo · <kbd>Y</kbd> redo · <kbd>R</kbd> restart · <kbd>H</kbd> hint<br><kbd>Q</kbd> <kbd>E</kbd> turn the camera</div>'
    }`,
 );
 document.body.append(hud);
@@ -151,7 +154,7 @@ function present(prev: GameState, forward: boolean) {
     if (e & (EVENT.open | EVENT.close)) sound.door((e & EVENT.open) !== 0);
   } else sound.undo();
   updateHud();
-  if (s.moves >= 3) tip.classList.add('gone');
+  if (s.moves >= 3 && s.moves < 4) tip.classList.add('gone');
   if (forward && s.events & EVENT.win && run) {
     run.over = true;
     sound.win();
@@ -181,6 +184,10 @@ function act(a: string) {
     return;
   }
   if (run.over) return;
+  if (a === 'hint') {
+    askHint();
+    return;
+  }
   const prev = shown;
   if (a === 'undo' && sim.undo()) {
     run.clean = false;
@@ -196,8 +203,33 @@ function act(a: string) {
   }
 }
 
+/** Shows a line in the tip bubble for a while. */
+function say(text: string, ms = 5000) {
+  tip.textContent = text;
+  tip.classList.remove('gone');
+  clearTimeout(tipTimer);
+  tipTimer = window.setTimeout(() => tip.classList.add('gone'), ms);
+}
+
+/** Asks the solver (in the worker) for the way on from here; shows the next move as an arrow. */
+async function askHint() {
+  if (!run || run.over) return;
+  click();
+  const asked = sim.frame;
+  const r = run;
+  say('Thinking\u2026', 20000);
+  const answer = await hint(sim.level, sim.raw);
+  if (run !== r || sim.frame !== asked || r.over) return;
+  r.clean = false;
+  if (answer.solution) {
+    const c = answer.solution[0];
+    view.showHint(DIRS.indexOf(c.toLowerCase()));
+    say(`${c === c.toUpperCase() ? 'Push' : 'Step'} that way · ${answer.solution.length} ${answer.solution.length === 1 ? 'move' : 'moves'} to go from here`);
+  } else say(answer.complete ? 'No way to solve it from here: undo a few moves.' : 'Too many paths to check from here. Try undoing a little.');
+}
+
 const KEYS: Record<string, number> = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
-const ACTIONS: Record<string, string> = { KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', Escape: 'back' };
+const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', Escape: 'back' };
 addEventListener('keydown', (e) => {
   if (!run || e.metaKey || e.ctrlKey || e.altKey) {
     // Ctrl/Cmd+Z also undoes.

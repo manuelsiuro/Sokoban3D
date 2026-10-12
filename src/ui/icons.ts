@@ -21,6 +21,7 @@ const P: Record<string, string> = {
   crate: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M3.5 3.5l17 17M20.5 3.5l-17 17"/>',
   feather: '<path d="M20 4c-8 0-14 6-14 14l-2 2"/><path d="M6 18c8 0 14-6 14-14"/><path d="M9 15h6"/>',
   map: '<path d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2Z"/><path d="M9 4v14M15 6v14"/>',
+  bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
 };
 

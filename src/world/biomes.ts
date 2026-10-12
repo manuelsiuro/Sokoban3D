@@ -48,7 +48,7 @@ export const BIOMES: Record<string, Biome> = {
   desert: {
     skyTop: 0xf2b66d, skyBottom: 0xfbe6c4, fog: 0xf7dfba,
     ground: 0xf0cf8e, ground2: 0xe8c47f, soil: 0xc58a4f, rock: 0xa0673c,
-    wall: 'sandstone', wallColor: 0xd9a35f, wallTop: 0xe8bb78,
+    wall: 'sandstone', wallColor: 0xc4834a, wallTop: 0xd89d5c,
     crate: 0xb77b45, crateTrim: 0x6f4421, goal: 0x3fd0c9,
     sun: 0xffe2b0, sunIntensity: 2.6, ambient: 1.15,
     decor: ['cactus', 'cactus', 'pillar', 'rock'],
@@ -63,8 +63,8 @@ export const BIOMES: Record<string, Biome> = {
   },
   forge: {
     skyTop: 0x2a1a2e, skyBottom: 0x7a3326, fog: 0x4a2622,
-    ground: 0x5b5560, ground2: 0x524c57, soil: 0x3b3238, rock: 0x2c2429,
-    wall: 'basalt', wallColor: 0x37323b, wallTop: 0x4a434f,
+    ground: 0x8d8494, ground2: 0x857c8c, soil: 0x3b3238, rock: 0x2c2429,
+    wall: 'basalt', wallColor: 0x2a252e, wallTop: 0x3a3340,
     crate: 0x9a9fa8, crateTrim: 0x5d6168, goal: 0xff9a3d,
     sun: 0xffb27a, sunIntensity: 2.0, ambient: 0.9,
     decor: ['basalt', 'basalt', 'rock'],

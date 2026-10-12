@@ -161,6 +161,15 @@ export class View {
           const k = `${look.color}`;
           if (!special.has(k)) special.set(k, { geos: [], m: mat(look.color, look.opts) });
           special.get(k)!.geos.push(tile);
+        } else if (z !== 0) {
+          // Higher ground is lighter, dips darker, so the levels read at a glance.
+          const k = `z${z}|${(x + y) & 1}`;
+          if (!special.has(k)) {
+            const base = new THREE.Color((x + y) & 1 ? b.ground2 : b.ground);
+            base.lerp(new THREE.Color(z > 0 ? 0xffffff : 0x000000), Math.min(0.5, Math.abs(z) * 0.16));
+            special.set(k, { geos: [], m: mat(base.getHex(), { rough: 0.95 }) });
+          }
+          special.get(k)!.geos.push(tile);
         } else tiles[(x + y) & 1].push(tile);
         const colH = top + 0.5;
         if (colH > 0.01) soil.push(new THREE.BoxGeometry(1, colH, 1).translate(wx, top - 0.3 - colH / 2 + 0.02, wz));
@@ -168,7 +177,7 @@ export class View {
     // The rock under the island: deeper toward the middle, like a floating chunk of land.
     const key = (x: number, y: number) => `${x},${y}`;
     const inIsland = new Set(island.map(([x, y]) => key(x, y)));
-    for (const [x, y] of island) {
+    for (const [x, y, z] of island) {
       let edge = 0;
       for (let r = 1; r < 6; r++) {
         let ok = true;
@@ -179,8 +188,10 @@ export class View {
       const depth = 0.7 + edge * 0.75 + R.next() * 0.5;
       const wx = x - (grid.w - 1) / 2;
       const wz = y - (grid.h - 1) / 2;
-      rock.push(new THREE.BoxGeometry(0.96 - edge * 0.02, depth, 0.96 - edge * 0.02).translate(wx, -0.8 - depth / 2, wz));
-      soil.push(new THREE.BoxGeometry(1, 0.5, 1).translate(wx, -0.55, wz));
+      // Below the cell's own floor (pits and lava sit lower than the ground around them).
+      const base = Math.min(0, z) * LEVEL_H - 0.3;
+      rock.push(new THREE.BoxGeometry(0.96 - edge * 0.02, depth, 0.96 - edge * 0.02).translate(wx, base - 0.5 - depth / 2, wz));
+      soil.push(new THREE.BoxGeometry(1, 0.5, 1).translate(wx, base - 0.25, wz));
     }
     const add = (geos: THREE.BufferGeometry[], m: THREE.Material, cast = false) => {
       if (!geos.length) return;
@@ -278,6 +289,7 @@ export class View {
    */
   show(s: GameState, prev: GameState | null) {
     if (!this.grid) return;
+    this.showHint(null);
     const animate = prev !== null && !this.reducedMotion;
     this.t0 = this.now;
     const falls = s.events & (EVENT.fall | EVENT.lost);
@@ -373,6 +385,32 @@ export class View {
   set idle(on: boolean) {
     this.orbiting = on;
     if (!on) this.yaw = Math.round(this.yaw);
+  }
+
+  private hintArrow: THREE.Group | null = null;
+  private hintDir = 0;
+
+  /** A bouncing arrow beside the player, pointing the way of the next move (null: none). */
+  showHint(dir: number | null) {
+    if (!this.hintArrow) {
+      const g = new THREE.Group();
+      const m = mat(0xffd447, { emissive: 0xffb000, emissiveIntensity: 0.8, rough: 0.3 });
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.3, 12), m);
+      head.rotation.x = -Math.PI / 2;
+      head.position.z = -0.2;
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 8), m);
+      shaft.rotation.x = -Math.PI / 2;
+      shaft.position.z = 0.05;
+      g.add(head, shaft);
+      this.hintArrow = g;
+      this.scene.add(g);
+    }
+    this.hintArrow.visible = dir !== null;
+    if (dir !== null) {
+      this.hintDir = dir;
+      // The arrow's tip looks along -z: turn it to the direction.
+      this.hintArrow.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir];
+    }
   }
 
   /** Turns the camera a quarter turn (dir ±1). */
@@ -480,6 +518,11 @@ export class View {
       });
     }
     this.mech?.update(time, dt);
+    if (this.hintArrow?.visible && this.state) {
+      const at = this.pos(this.state.cell, this.state.z);
+      const bob = 0.55 + Math.sin(time * 6) * 0.08;
+      this.hintArrow.position.set(at.x + DX[this.hintDir] * bob, at.y + 0.5, at.z + DY[this.hintDir] * bob);
+    }
     // Particles.
     for (let k = this.particles.length - 1; k >= 0; k--) {
       const q = this.particles[k];
