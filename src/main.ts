@@ -40,6 +40,8 @@ import type { LevelDef } from './levels/types';
  * script (title → levels → play → summary → …).
  */
 migrateStorage();
+// The boot guard in index.html stands down: the game started.
+(window as { __cratelandsBooted?: boolean }).__cratelandsBooted = true;
 const settings = loadSettings();
 const sound = new Sound();
 const applySound = () => {

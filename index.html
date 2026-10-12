@@ -18,6 +18,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <script>
+      // Boot guard: if the game hasn't started after a while (a broken offline copy, a
+      // missing file), forget the offline copy and load once more from the server.
+      setTimeout(function () {
+        if (window.__cratelandsBooted || sessionStorage.getItem('cratelands.rescued')) return;
+        try {
+          sessionStorage.setItem('cratelands.rescued', '1');
+        } catch (e) {}
+        var regs = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations() : Promise.resolve([]);
+        Promise.all([
+          regs.then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }),
+          window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }) : null,
+        ]).finally(function () {
+          location.reload();
+        });
+      }, 12000);
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

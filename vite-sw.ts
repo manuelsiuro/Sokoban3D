@@ -44,8 +44,40 @@ const APP = '__APP__';
 const FONTS = 'cratelands-fonts';
 const ASSETS = __ASSETS__;
 
+/** The files a stored index.html loads (./assets/…), which must be stored with it. */
+const refsOf = (html) => [...html.matchAll(/(?:src|href)="\\.\\/(assets\\/[^"]+)"/g)].map((m) => './' + m[1]);
+
+/** A stored copy is whole when its index.html and everything it loads are in it. */
+async function whole(cache) {
+  const page = await cache.match('./index.html');
+  if (!page) return false;
+  for (const ref of refsOf(await page.text())) if (!(await cache.match(ref))) return false;
+  return true;
+}
+
+// Install: store this build, fresh from the server. The HTTP cache (Pages keeps pages for
+// 10 minutes) could hand back the previous build's index.html, whose files a deploy has
+// deleted: a blank page. So every file skips it (and the CDN, with a version tag), and
+// the copy is checked whole before it's used.
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  e.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      for (const url of ASSETS) {
+        const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'sw=' + CACHE, { cache: 'reload' });
+        if (!res.ok) throw new Error('could not store ' + url);
+        await cache.put(url, res);
+      }
+      if (!(await whole(cache))) throw new Error('the stored build is not whole');
+      // The copy players run now is broken (a blank page): take over at once instead of waiting.
+      for (const key of await caches.keys()) {
+        if (key.startsWith('cratelands-') && key !== CACHE && key !== FONTS && !(await whole(await caches.open(key)))) {
+          self.healing = true;
+          await self.skipWaiting();
+        }
+      }
+    })(),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -53,7 +85,12 @@ self.addEventListener('activate', (e) => {
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith('cratelands-') && k !== CACHE && k !== FONTS).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+      .then(() => self.clients.claim())
+      .then(async () => {
+        // Pages left blank by a broken copy load again from this one.
+        if (!self.healing) return;
+        for (const c of await self.clients.matchAll({ type: 'window' })) c.navigate(c.url).catch(() => {});
+      }),
   );
 });
 
