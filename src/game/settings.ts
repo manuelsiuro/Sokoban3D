@@ -8,12 +8,22 @@ export interface Settings {
   muted: boolean;
   /** No screen shake or flashes. */
   reducedMotion: boolean;
+  music: boolean;
+  /** 0..1 */
+  musicVolume: number;
+  /** Chosen cosmetics (ids from achievements.ts). */
+  skin: string;
+  outfit: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.8,
   muted: false,
   reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+  music: true,
+  musicVolume: 0.5,
+  skin: 'world',
+  outfit: 'red',
 };
 
 export function loadSettings(): Settings {

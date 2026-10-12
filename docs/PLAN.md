@@ -69,3 +69,11 @@ it with earlier ones, the last one is a showpiece.
 3. Biome batches, one release each: Tundra → Desert → Sky → Forge → Crystal → Clockwork
    (~10–12 levels each, mechanic + tests + curve).
 4. Systems: hints, daily puzzle, then editor, achievements, music.
+
+## Status
+
+- v0.1 Phase 0–1: rules, solver, Meadow, 3D view. v0.2 Phase 2: world map, progression.
+- v0.3–v0.8 Phase 3: Tundra, Desert (+ hints), Sky, Forge, Crystal, Clockwork.
+- Phase 4: hints, daily puzzle with streaks, workshop with share links, trophies and
+  cosmetics, generated music, settings.
+- Not done: ghost replays of best runs, a GitHub remote and Pages deploy.

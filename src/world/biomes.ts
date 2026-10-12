@@ -80,8 +80,8 @@ export const BIOMES: Record<string, Biome> = {
   clockwork: {
     skyTop: 0x3b5470, skyBottom: 0xd9c49a, fog: 0xc9b58c,
     ground: 0xbfae8c, ground2: 0xb3a27f, soil: 0x7a6146, rock: 0x5e4a36,
-    wall: 'brass', wallColor: 0xb8893a, wallTop: 0xd6a84f,
-    crate: 0x8c6a4a, crateTrim: 0x4f3a26, goal: 0x6fe0ff,
+    wall: 'brass', wallColor: 0x4a3f38, wallTop: 0x6b5d50,
+    crate: 0x8c6a4a, crateTrim: 0x4f3a26, goal: 0xff8f5a,
     sun: 0xffe9c4, sunIntensity: 2.2, ambient: 1.1,
     decor: ['gear', 'gear', 'pillar'],
   },

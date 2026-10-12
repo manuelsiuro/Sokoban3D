@@ -138,9 +138,13 @@ export class Mechanics {
         }
       } else if (t === TILE.teleport) {
         const color = PAIR[g.param[c]];
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.06, 8, 24), mat(color, { emissive: color, emissiveIntensity: 0.8, rough: 0.3 }));
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.copy(at).add(new THREE.Vector3(0, 0.05, 0));
+        // A hexagonal metal pad with a glowing core (goals are rings; pads are filled).
+        const ring = new THREE.Group();
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.06, 6), mat(0x5a5f6b, { metal: 0.6, rough: 0.35 }));
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.07, 6), mat(color, { emissive: color, emissiveIntensity: 1.1, rough: 0.3 }));
+        core.position.y = 0.01;
+        ring.add(pad, core);
+        ring.position.copy(at).add(new THREE.Vector3(0, 0.03, 0));
         const swirl = new THREE.Group();
         for (let k = 0; k < 3; k++) {
           const s = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), mat(color, { emissive: color, emissiveIntensity: 1 }));

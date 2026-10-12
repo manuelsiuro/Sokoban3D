@@ -7,18 +7,28 @@ import { WORLDS } from './levels/worlds';
 import { View } from './render/View';
 import { MapView } from './render/MapView';
 import { Sound } from './audio/Sound';
-import { loadSettings, saveSettings } from './game/settings';
-import { migrateStorage } from './game/storage';
+import { loadSettings, resetProgress, saveSettings } from './game/settings';
+import { KEYS as STORE, migrateStorage, readJSON, writeJSON } from './game/storage';
+import { ACHIEVEMENTS, OUTFITS, SKINS, builtOne, checkAchievements, earned, markBuilt, unlockedCosmetics } from './game/achievements';
+import { today } from './game/daily';
+import { cacheDaily, cachedDaily, currentStreak, loadDaily, saveDaily } from './game/dailyProgress';
+import { decodeLevel, shareLink } from './game/share';
+import { initialState } from './sim/Sim';
+import { parseLevel } from './sim/grid';
 import { isUnlocked, isWorldOpen, loadProgress, nextLevel, saveResult, totalStars, worldGate, worldLevels, worldStars } from './game/progress';
 import { starLimits, starsFor } from './game/score';
-import { TOUCH, h, setText } from './ui/dom';
+import { TOUCH, closeOverlay, h, setText } from './ui/dom';
 import { icon } from './ui/icons';
 import { showTitle } from './ui/screens/title';
 import { showWorlds } from './ui/screens/worlds';
 import { showSummary } from './ui/screens/summary';
+import { newDraft, showEditor, type Draft } from './ui/screens/editor';
+import { showSettings } from './ui/screens/settings';
+import { showTrophies } from './ui/screens/trophies';
 import { registerServiceWorker } from './app/pwa';
-import { hint } from './app/helper';
+import { generateDaily, hint } from './app/helper';
 import { DIRS } from './sim/grid';
+import type { LevelDef } from './levels/types';
 
 /**
  * Wiring: storage first, then the long-lived objects, then the flows between screens.
@@ -28,7 +38,10 @@ import { DIRS } from './sim/grid';
 migrateStorage();
 const settings = loadSettings();
 const sound = new Sound();
-const applySound = () => sound.setVolume(settings.muted ? 0 : settings.sfxVolume);
+const applySound = () => {
+  sound.setVolume(settings.muted ? 0 : settings.sfxVolume);
+  sound.setMusic(settings.music, settings.musicVolume);
+};
 applySound();
 const click = () => sound.click();
 const par = (index: number) => SOLUTIONS[LEVELS[index].id]?.length ?? 0;
@@ -47,12 +60,13 @@ let mode: 'level' | 'map' = 'level';
 /** The level on screen (also behind the menus). */
 let sim = new Sim(LEVELS[0]);
 let shown: GameState = sim.state;
-function showLevel(index: number) {
-  sim = new Sim(LEVELS[index]);
+function showLevel(level: LevelDef) {
+  sound.setMusic(settings.music, settings.musicVolume, level.world);
+  sim = new Sim(level);
   shown = sim.state;
-  view.setLevel(LEVELS[index], sim.grid, shown);
+  view.setLevel(level, sim.grid, shown);
 }
-showLevel(nextLevel() ?? 0);
+showLevel(LEVELS[nextLevel() ?? 0]);
 
 // ------------------------------------------------------------------ HUD
 const hud = h(
@@ -86,13 +100,15 @@ let tipTimer = 0;
 function updateHud() {
   const s = shown;
   setText($('.hud-moves b'), String(s.moves));
-  setText($('.hud-moves small'), `/ par ${par(run?.index ?? 0)}`);
+  setText($('.hud-moves small'), run?.par ? `/ par ${run.par}` : 'moves');
   $<HTMLButtonElement>('[data-a="undo"]').disabled = sim.frame === 0;
 }
 
 // ------------------------------------------------------------------ playing
 interface Run {
-  index: number;
+  level: LevelDef;
+  /** The fewest moves (0: unknown). */
+  par: number;
   /** No undo or restart used. */
   clean: boolean;
   /** Solved: input is closed while the summary comes. */
@@ -105,14 +121,15 @@ interface RunResult {
 }
 let run: Run | null = null;
 
+/** A campaign level's label: its world and number. */
+const campaignLabel = (level: LevelDef) => `${WORLDS.find((w) => w.id === level.world)?.name ?? ''} · ${LEVELS.filter((l) => l.world === level.world).indexOf(level) + 1}`;
+
 /** Plays a level until it's solved; resolves with the final state (null if the player left). */
-function play(index: number): Promise<RunResult | null> {
-  showLevel(index);
+function play(level: LevelDef, label: string, levelPar: number): Promise<RunResult | null> {
+  showLevel(level);
   mode = 'level';
   view.idle = false;
-  const level = LEVELS[index];
-  const world = WORLDS.find((w) => w.id === level.world);
-  setText($('.hud-title small'), `${world?.name ?? ''} · ${LEVELS.filter((l) => l.world === level.world).indexOf(level) + 1}`);
+  setText($('.hud-title small'), label);
   setText($('.hud-title b'), level.name);
   tip.textContent = level.tip;
   tip.classList.remove('gone');
@@ -120,7 +137,7 @@ function play(index: number): Promise<RunResult | null> {
   tipTimer = window.setTimeout(() => tip.classList.add('gone'), 9000);
   hud.classList.remove('hidden');
   return new Promise((resolve) => {
-    run = { index, clean: true, over: false, done: resolve };
+    run = { level, par: levelPar, clean: true, over: false, done: resolve };
     updateHud();
   });
 }
@@ -312,18 +329,56 @@ requestAnimationFrame(frame);
 // ------------------------------------------------------------------ flows
 const worldIndex = (levelIndex: number) => WORLDS.findIndex((w) => w.id === LEVELS[levelIndex].world);
 
+/** A short message at the top of the screen. */
+function toast(html: string, ms = 3200) {
+  const t = h('div', 'toast', html);
+  document.body.append(t);
+  setTimeout(() => closeOverlay(t, 400), ms);
+}
+
+/** Checks achievements after a solve; returns a line for the summary (and toasts each new one). */
+function newTrophies(): string {
+  const fresh = checkAchievements({ progress: loadProgress(), daily: loadDaily() });
+  fresh.forEach((a, k) => setTimeout(() => toast(`${icon('trophy', 18)} <span>${a.name}${a.reward ? ' · new look in Trophies' : ''}</span>`), 600 + k * 900));
+  return fresh.length ? `${icon('trophy', 14)} ${fresh.map((a) => a.name).join(', ')}` : '';
+}
+
+/** Puts the chosen crate skin and outfit on (an unknown or locked choice falls back to the default). */
+function applyLook() {
+  const { skins, outfits } = unlockedCosmetics();
+  const skin = SKINS.find((k) => k.id === settings.skin && skins.has(k.id)) ?? SKINS[0];
+  const outfit = OUTFITS.find((o) => o.id === settings.outfit && outfits.has(o.id)) ?? OUTFITS[0];
+  view.setLook(skin, outfit);
+}
+applyLook();
+
+/** Copies text (or opens the share sheet on phones); resolves with what happened. */
+async function shareText(text: string, url?: string): Promise<string> {
+  try {
+    if (navigator.share && TOUCH) {
+      await navigator.share({ text, url });
+      return 'Shared!';
+    }
+    await navigator.clipboard.writeText(url ? `${text} ${url}` : text);
+    return 'Copied!';
+  } catch {
+    return 'Could not share';
+  }
+}
+
 /** Plays from a level on, through Next, until the player leaves; resolves with the last level played. */
 async function levelFlow(index: number): Promise<number> {
   for (;;) {
-    const r = await play(index);
+    const r = await play(LEVELS[index], campaignLabel(LEVELS[index]), par(index));
     if (!r) return index;
     const { state: s, clean } = r;
     const p = par(index);
     const stars = starsFor(s.moves, p);
     const best = saveResult(LEVELS[index].id, stars, s.moves, clean);
+    const extra = newTrophies();
     // Next stays inside the world; after its last level, back to the map.
     const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === LEVELS[index].world ? index + 1 : -1;
-    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0 }, click);
+    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0, extra }, click);
     if (choice === 'levels') return index;
     if (choice === 'next') index = next;
   }
@@ -351,10 +406,78 @@ async function worldsFlow(start: number) {
         levels: levels.map(({ l, i }) => ({ index: i, name: l.name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
       };
     });
-    const i = await showWorlds(cards, at, { select: (k) => map.select(k), pick: (x, y) => map.pick(x, y) }, click);
+    const i = await showWorlds(cards, at, { select: (k) => (map.select(k), sound.setMusic(settings.music, settings.musicVolume, WORLDS[k].id)), pick: (x, y) => map.pick(x, y) }, click);
     if (i === null) return;
     const last = await levelFlow(i);
     at = { world: worldIndex(last), sheet: true };
+  }
+}
+
+/** Today's daily puzzle: generated (or taken from the cache), played, its streak kept. */
+async function dailyFlow() {
+  const date = today();
+  let daily = cachedDaily(date);
+  if (!daily) {
+    const wait = h('div', 'modal', `<div class="card"><h2>Daily puzzle</h2><p class="summary-time">Building today’s island…</p></div>`);
+    document.body.append(wait);
+    daily = await generateDaily(date);
+    wait.remove();
+    if (!daily) {
+      toast('No daily puzzle today, sorry. Try again later.');
+      return;
+    }
+    cacheDaily(daily);
+  }
+  for (;;) {
+    const r = await play(daily.level, `Daily · ${date}`, daily.par);
+    if (!r) return;
+    const s = r.state;
+    const stars = starsFor(s.moves, daily.par);
+    const streak = saveDaily(date, stars, s.moves);
+    const extra = [streak > 1 ? `${streak}-day streak` : 'Come back tomorrow for a new one', newTrophies()].filter(Boolean).join(' · ');
+    const text = `Cratelands daily ${date}: ${'★'.repeat(stars)}${'☆'.repeat(3 - stars)} in ${s.moves} moves (par ${daily.par})${streak > 1 ? `, ${streak}-day streak` : ''}`;
+    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: daily.par, limits: starLimits(daily.par), best: false, clean: r.clean, hasNext: false, extra, share: () => shareText(text) }, click);
+    if (choice !== 'retry') return;
+  }
+}
+
+/** Plays a level from a share link (#lvl=…), then goes on to the title. */
+async function sharedFlow(level: LevelDef, levelPar: number) {
+  for (;;) {
+    const r = await play(level, 'Shared level', levelPar);
+    if (!r) return;
+    const s = r.state;
+    const stars = levelPar ? starsFor(s.moves, levelPar) : 1;
+    const choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: levelPar, limits: starLimits(levelPar), best: false, clean: r.clean, hasNext: false }, click);
+    if (choice !== 'retry') return;
+  }
+}
+
+/** The workshop: edit, test-play, come back to the same draft. */
+async function workshopFlow() {
+  let draft = readJSON<Draft | null>(STORE.editor, null);
+  if (!draft || !Array.isArray(draft.base) || draft.base.length !== draft.w * draft.h) draft = newDraft();
+  for (;;) {
+    mode = 'level';
+    const choice = await showEditor(draft, {
+      save: (d) => {
+        draft = d;
+        writeJSON(STORE.editor, d);
+      },
+      check: async (level) => {
+        const r = await hint(level, initialState(parseLevel(level)));
+        return r.solution ? r.solution.length : r.complete ? 0 : -1;
+      },
+      share: async (level, levelPar) => shareText(`Try my Cratelands level “${level.name}”${levelPar ? ` (par ${levelPar})` : ''}:`, shareLink(level, levelPar)),
+      click,
+    });
+    if (choice.type === 'back') return;
+    const r = await play(choice.level, 'Workshop', choice.par);
+    if (!r) continue;
+    markBuilt();
+    const extra = newTrophies();
+    const s = r.state;
+    await showSummary({ stars: choice.par ? starsFor(s.moves, choice.par) : 1, moves: s.moves, pushes: s.pushes, par: choice.par, limits: starLimits(choice.par), best: false, clean: r.clean, hasNext: false, extra }, click);
   }
 }
 
@@ -362,9 +485,13 @@ async function titleFlow() {
   for (;;) {
     const p = loadProgress();
     const next = nextLevel(p);
-    showLevel(next ?? 0);
+    showLevel(LEVELS[next ?? 0]);
     mode = 'level';
     view.idle = true;
+    // Trophies earned by progress made elsewhere (an older version, another flow).
+    newTrophies();
+    const have = earned();
+    const date = today();
     const choice = await showTitle(
       {
         stars: totalStars(p),
@@ -373,9 +500,11 @@ async function titleFlow() {
         levels: LEVELS.length,
         worlds: WORLDS.length,
         worldsOpen: WORLDS.filter((_, k) => isWorldOpen(k, p)).length,
-        next: next === null ? null : { name: LEVELS[next].name, number: next + 1 },
+        next: next === null ? null : { name: `${LEVELS[next].name} (${WORLDS[worldIndex(next)].name})`, number: worldLevels(LEVELS[next].world).findIndex(({ i }) => i === next) + 1 },
         fresh: Object.keys(p).length === 0,
         muted: settings.muted,
+        daily: { streak: currentStreak(date), stars: loadDaily().results[date]?.stars ?? 0 },
+        trophies: { have: have.size, total: ACHIEVEMENTS.length },
         toggleSound: () => {
           settings.muted = !settings.muted;
           saveSettings(settings);
@@ -385,16 +514,43 @@ async function titleFlow() {
       },
       click,
     );
-    if (choice === 'play') {
-      await levelFlow(next ?? 0);
-      continue;
-    }
-    await worldsFlow(next === null ? 0 : worldIndex(next));
+    if (choice === 'play') await levelFlow(next ?? 0);
+    else if (choice === 'worlds') await worldsFlow(next === null ? 0 : worldIndex(next));
+    else if (choice === 'daily') await dailyFlow();
+    else if (choice === 'workshop') await workshopFlow();
+    else if (choice === 'trophies') {
+      const { skins, outfits } = unlockedCosmetics(have);
+      await showTrophies({ progress: p, daily: loadDaily(), built: builtOne() }, have, { skins, outfits }, { skin: settings.skin, outfit: settings.outfit }, {
+        choose: (kind, id) => {
+          if (kind === 'skin') settings.skin = id;
+          else settings.outfit = id;
+          saveSettings(settings);
+          applyLook();
+        },
+        click,
+      });
+    } else if (choice === 'settings')
+      await showSettings(settings, {
+        change: (s) => {
+          saveSettings(s);
+          applySound();
+          view.reducedMotion = s.reducedMotion;
+        },
+        reset: () => resetProgress(),
+        click,
+      });
   }
 }
 
-// Dev only: ?level=<id> opens that level straight away (for checking content).
+// A share link (#lvl=…) opens that level first; in dev, ?level=<id> opens a campaign level.
+const shared = location.hash.startsWith('#lvl=') ? decodeLevel(location.hash.slice(5)) : null;
+if (location.hash.startsWith('#lvl=')) history.replaceState(null, '', location.pathname + location.search);
 const devLevel = import.meta.env.DEV ? LEVELS.findIndex((l) => l.id === new URLSearchParams(location.search).get('level')) : -1;
-if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
+if (shared) sharedFlow(shared.level, shared.par).then(titleFlow);
+else if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
 else titleFlow();
+// A share link opened while the game runs (only the hash changed): start over with it.
+addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#lvl=')) location.reload();
+});
 registerServiceWorker(() => {});

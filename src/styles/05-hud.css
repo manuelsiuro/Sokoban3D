@@ -156,7 +156,7 @@
 /* Phone portrait: the tip sits above the d-pad and the bar. */
 @media (max-width: 520px) {
   .hud-tip {
-    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 182px);
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 178px);
   }
   .dpad {
     grid-template-columns: repeat(3, 50px);
@@ -164,7 +164,7 @@
   }
   .hud-bar {
     flex-wrap: wrap;
-    width: 108px;
+    width: 166px;
   }
   .hud-bar .sep {
     display: none;
@@ -176,5 +176,9 @@
   .hud-tip {
     top: calc(max(12px, env(safe-area-inset-top)) + 58px);
     bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+    max-width: min(260px, 30vw);
+    transform: none;
+    text-align: left;
   }
 }

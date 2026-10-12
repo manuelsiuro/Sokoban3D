@@ -1,7 +1,7 @@
 import { h } from '../dom';
 import { icon } from '../icons';
 
-export type TitleChoice = 'play' | 'worlds';
+export type TitleChoice = 'play' | 'worlds' | 'daily' | 'workshop' | 'trophies' | 'settings';
 
 export interface TitleInfo {
   stars: number;
@@ -10,6 +10,9 @@ export interface TitleInfo {
   levels: number;
   worlds: number;
   worldsOpen: number;
+  /** Today's daily: the streak, and the stars if solved today. */
+  daily: { streak: number; stars: number };
+  trophies: { have: number; total: number };
   /** The next level to play (name and number), or null when every level is solved. */
   next: { name: string; number: number } | null;
   fresh: boolean;
@@ -42,8 +45,24 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           <span class="menu-text"><span class="menu-label">Worlds</span><small>${info.worldsOpen}/${info.worlds} open · ${info.solved}/${info.levels} solved</small></span>
           ${icon('chevronRight', 16)}<i class="menu-bar"></i>
         </button>
+        <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
+          <span class="menu-ic">${icon('star', 18)}</span>
+          <span class="menu-text"><span class="menu-label">Daily puzzle</span><small>${info.daily.stars ? `Solved today · ${'★'.repeat(info.daily.stars)}` : 'A new puzzle every day'}${info.daily.streak ? ` · ${info.daily.streak}-day streak` : ''}</small></span>
+          ${icon('chevronRight', 16)}<i class="menu-bar"></i>
+        </button>
+        <div class="menu-pair">
+          <button class="menu-btn" data-c="workshop" style="--tone:#7466f0;--tone-2:#4f3fd1;--done:0%">
+            <span class="menu-ic">${icon('crate', 18)}</span>
+            <span class="menu-text"><span class="menu-label">Workshop</span><small>Build and share</small></span>
+          </button>
+          <button class="menu-btn" data-c="trophies" style="--tone:#f2a51f;--tone-2:#c77d0a;--done:${((info.trophies.have / info.trophies.total) * 100).toFixed(1)}%">
+            <span class="menu-ic">${icon('trophy', 18)}</span>
+            <span class="menu-text"><span class="menu-label">Trophies</span><small>${info.trophies.have}/${info.trophies.total}</small></span>
+            <i class="menu-bar"></i>
+          </button>
+        </div>
       </div>
-      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><span class="keys-hint">Arrows or WASD to move · Z undo · Q/E turn</span></div>
+      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><span class="keys-hint">Arrows or WASD to move · Z undo · Q/E turn</span></div>
     </div>
     <span class="title-version">v${__APP_VERSION__}</span>`,
   );

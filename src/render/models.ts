@@ -30,17 +30,18 @@ const mesh = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0)
 export const CRATE = 0.84;
 
 /** A wooden crate: a rounded frame, inset panels and a diagonal brace on each side. */
-export function crateModel(b: Biome): { group: THREE.Group; panels: THREE.MeshStandardMaterial } {
+export function crateModel(b: Biome, look?: { crate: number; trim: number }): { group: THREE.Group; panels: THREE.MeshStandardMaterial } {
   const g = new THREE.Group();
   const s = CRATE;
-  g.add(mesh(new RoundedBoxGeometry(s, s, s, 2, 0.06), mat(b.crateTrim, { rough: 0.9 })));
+  const trimColor = look && look.trim >= 0 ? look.trim : b.crateTrim;
+  g.add(mesh(new RoundedBoxGeometry(s, s, s, 2, 0.06), mat(trimColor, { rough: 0.9 })));
   // Panels get their own material, so a crate on a goal can glow.
-  const panels = new THREE.MeshStandardMaterial({ color: b.crate, roughness: 0.85 });
+  const panels = new THREE.MeshStandardMaterial({ color: look && look.crate >= 0 ? look.crate : b.crate, roughness: 0.85 });
   const p = s * 0.78;
   const t = 0.03;
   const face = new THREE.BoxGeometry(p, p, t);
   const brace = new THREE.BoxGeometry(p * 1.25, 0.09, t);
-  const trim = mat(b.crateTrim, { rough: 0.9 });
+  const trim = mat(trimColor, { rough: 0.9 });
   for (let k = 0; k < 4; k++) {
     const side = new THREE.Group();
     side.rotation.y = (k * Math.PI) / 2;
@@ -59,13 +60,14 @@ export function crateModel(b: Biome): { group: THREE.Group; panels: THREE.MeshSt
 }
 
 /** The pusher: a round little character with a cap, eyes on the front (+z). */
-export function playerModel(): { group: THREE.Group; body: THREE.Group } {
+export function playerModel(): { group: THREE.Group; body: THREE.Group; suit: THREE.MeshStandardMaterial; cap: THREE.MeshStandardMaterial } {
   const g = new THREE.Group();
   const body = new THREE.Group();
   g.add(body);
-  const suit = mat(0x2f6fd0, { rough: 0.6 });
+  // The suit and cap have their own materials: outfits recolor them.
+  const suit = new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.6 });
   const skin = mat(0xf2c9a0, { rough: 0.7 });
-  const cap = mat(0xe0433a, { rough: 0.55 });
+  const cap = new THREE.MeshStandardMaterial({ color: 0xe0433a, roughness: 0.55 });
   body.add(mesh(new THREE.CapsuleGeometry(0.2, 0.18, 4, 12), suit, 0, 0.29, 0));
   body.add(mesh(new THREE.SphereGeometry(0.19, 16, 12), skin, 0, 0.66, 0));
   const capTop = mesh(new THREE.SphereGeometry(0.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), cap, 0, 0.7, 0);
@@ -82,7 +84,7 @@ export function playerModel(): { group: THREE.Group; body: THREE.Group } {
   for (const x of [-0.2, 0.2]) body.add(mesh(new THREE.SphereGeometry(0.065, 10, 8), skin, x, 0.32, 0.05));
   // Boots.
   for (const x of [-0.09, 0.09]) body.add(mesh(new THREE.SphereGeometry(0.08, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x5a3a22), x, 0, 0.02));
-  return { group: g, body };
+  return { group: g, body, suit, cap };
 }
 
 /** A goal pad: a glowing ring set in the floor. The ring's material pulses when uncovered. */

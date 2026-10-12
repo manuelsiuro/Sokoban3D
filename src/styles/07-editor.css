@@ -1,0 +1,164 @@
+/* ------------------------------------------------------------ workshop (editor) */
+.ed-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ed-name {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  font: 600 16px var(--font-ui);
+  color: var(--ink);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow);
+}
+
+.ed-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-btn.small {
+  width: 32px;
+  height: 32px;
+  font: 700 18px var(--font-ui);
+}
+
+.ed-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.ed-group small {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.ed-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ed-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.ed-tool i {
+  font-style: normal;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.ed-tool span {
+  color: var(--ink);
+}
+
+.ed-tool.on {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-2);
+}
+
+.ed-tool.on span {
+  color: white;
+}
+
+.ed-grid-wrap {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.ed-grid {
+  --cell: min(38px, calc((100vw - 40px) / var(--w)));
+  display: grid;
+  grid-template-columns: repeat(var(--w), var(--cell));
+  gap: 2px;
+  width: max-content;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+.ed-cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  border-radius: 5px;
+  font-size: calc(var(--cell) * 0.55);
+  line-height: 1;
+  color: var(--ink);
+}
+
+.ed-cell.bf {
+  background: #cfe8b8;
+}
+.ed-cell.bw {
+  background: #4f6b52;
+}
+.ed-cell.bv {
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.15);
+}
+.ed-cell.tice {
+  background: #8fd3f5;
+}
+.ed-cell.tpit {
+  background: #b88b52;
+}
+.ed-cell.tlava {
+  background: #ff7a2a;
+}
+.ed-cell.tx {
+  background: #e6dcc8;
+}
+.ed-cell.goal {
+  box-shadow: inset 0 0 0 3px #f2b51f;
+}
+
+.ed-cell sup {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2f4f8a;
+}
+
+.ed-status {
+  min-height: 1.4em;
+  margin: 10px 0;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.ed-status.bad {
+  color: #c2412f;
+}
+
+.ed-actions {
+  flex-wrap: wrap;
+}

@@ -257,3 +257,19 @@ body.touch .title-foot > span {
     animation: none;
   }
 }
+
+/* Two small menu entries side by side. */
+.menu-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.menu-pair .menu-btn {
+  min-width: 0;
+}
+
+.title-foot .icon-btn.small {
+  width: 36px;
+  height: 36px;
+}

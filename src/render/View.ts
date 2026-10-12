@@ -255,7 +255,7 @@ export class View {
 
     // Crates.
     for (let k = 0; k < grid.crates.length; k++) {
-      const c = crateModel(b);
+      const c = crateModel(b, grid.crateKind[k] === 0 ? this.look : undefined);
       dressCrate(c.group, c.panels, grid.crateKind[k]);
       c.panels.userData.base = c.panels.color.getHex();
       this.scene.add(c.group);
@@ -379,6 +379,16 @@ export class View {
 
   private shownFacing() {
     return this.player.group.rotation.y / (Math.PI / 2);
+  }
+
+  /** The crate skin (colors, or -1 for the world's own wood). */
+  private look = { crate: -1, trim: -1 };
+
+  /** Cosmetics: the crate skin (applied from the next level built) and the pusher's outfit. */
+  setLook(skin: { crate: number; trim: number }, outfit: { cap: number; suit: number }) {
+    this.look = { crate: skin.crate, trim: skin.trim };
+    this.player.cap.color.set(outfit.cap);
+    this.player.suit.color.set(outfit.suit);
   }
 
   /** Behind the title screen the camera orbits slowly; in play it settles on a quarter turn. */

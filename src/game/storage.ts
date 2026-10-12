@@ -12,14 +12,19 @@ export const KEYS = {
   version: `${PREFIX}.version`,
   // Progress (wiped by "Reset progress").
   progress: `${PREFIX}.progress`,
-  // Preferences (kept on reset).
+  daily: `${PREFIX}.daily`,
+  achievements: `${PREFIX}.achievements`,
+  // Preferences and creations (kept on reset).
   settings: `${PREFIX}.settings`,
+  editor: `${PREFIX}.editor`,
+  // A cache (today's generated puzzle).
+  dailyCache: `${PREFIX}.dailyCache`,
 } as const;
 
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
 
 /** The keys "Reset progress" wipes. */
-export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress];
+export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.daily, KEYS.achievements];
 
 export function readText(key: StorageKey): string | null {
   try {

@@ -138,7 +138,7 @@ export function parseLevel(level: LevelDef): Grid {
       if (t[0] !== TILE.plain || k !== ' ') special = true;
     }
   if (start < 0) throw new Error(`${level.id}: no player`);
-  // Floor: every cell reachable from the player without crossing walls, plus explicit '-'.
+  // Inside: every cell reachable from the player without crossing walls or holes.
   const inside = new Uint8Array(n);
   const todo = [start];
   inside[start] = 1;
@@ -161,7 +161,8 @@ export function parseLevel(level: LevelDef): Grid {
     const x = i % w;
     const y = (i - x) / w;
     const c = ch(x, y);
-    if (inside[i] || c === '#' || c === '-') {
+    // Floor: reached from the player, or marked: '-', walls' bases, anything with a crate, goal or the player on it.
+    if (inside[i] || '#-$*.@+'.includes(c)) {
       const d = level.heights?.[y]?.[x] ?? '0';
       if (!/[0-9]/.test(d)) throw new Error(`${level.id}: bad height '${d}'`);
       floor[i] = Number(d) - (tile[i] === TILE.pit || tile[i] === TILE.lava ? 1 : 0);

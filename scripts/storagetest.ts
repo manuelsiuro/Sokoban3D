@@ -42,4 +42,16 @@ blocked = false;
 // Garbage in storage falls back to the right shape.
 mem.set(KEYS.progress, '[1,2,3]');
 check(Object.keys(loadProgress()).length === 0, 'a wrong shape falls back to {}');
+// The daily streak: days in a row count, a gap starts over, the best is kept.
+const { saveDaily, currentStreak, loadDaily } = await import('../src/game/dailyProgress');
+check(saveDaily('2026-10-10', 2, 30) === 1 && saveDaily('2026-10-11', 3, 25) === 2, 'consecutive days grow the streak');
+check(saveDaily('2026-10-11', 1, 40) === 2 && loadDaily().results['2026-10-11'].stars === 3, 'a second solve the same day keeps the best');
+check(currentStreak('2026-10-12') === 2 && currentStreak('2026-10-14') === 0, 'the streak lasts until a whole day is missed');
+check(saveDaily('2026-10-14', 3, 20) === 1 && loadDaily().best === 2, 'a gap starts over, the best streak stays');
+
+// Achievements are earned from progress and stay earned.
+const { checkAchievements, earned } = await import('../src/game/achievements');
+const fresh = checkAchievements({ progress: { 'meadow-1': { stars: 3, moves: 3 } }, daily: loadDaily() });
+check(fresh.some((a) => a.id === 'first') && fresh.some((a) => a.id === 'daily'), 'first solve and first daily are earned');
+check(checkAchievements({ progress: {}, daily: loadDaily() }).length === 0 && earned().has('first'), 'earned achievements stay earned');
 console.log('storage ok, version', SAVE_VERSION);

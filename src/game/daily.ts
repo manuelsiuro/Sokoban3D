@@ -5,6 +5,9 @@ import { propose } from '../sim/generator';
  * The daily puzzle: generated from the date, the same for everyone. Each weekday has its
  * world's mechanic (Sunday classic, Monday ice, …), and the room is the generator's best
  * whose par lands in a fair window. Generated in a worker (it takes a moment).
+ *
+ * The puzzle depends on the generator, the solver and the rules: changing any of them
+ * changes the dailies (scripts/dailytest.ts shows it). Avoid that while players have a streak.
  */
 const RECIPES: { world: string; name: string; gen: Record<string, number> }[] = [
   { world: 'meadow', name: 'Sunday Meadow', gen: { crates: 3, w: 6, h: 6 } },

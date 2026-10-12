@@ -85,8 +85,8 @@ export const SPECS: Record<string, { about: string; slots: Slot[] }> = {
       { name: 'Geode', difficulty: 3, par: [22, 42], gen: { crates: 3, colors: 3, w: 6, h: 6 }, tip: 'Sort the crystals by color.' },
       { name: 'Twin Beams', difficulty: 3, par: [20, 48], gen: { crates: 1, lasers: 2, w: 7, h: 6, tries: 3000 }, tip: 'Two lasers, two mirrors, two crystals.' },
       { name: 'Amethyst Hall', difficulty: 4, par: [28, 58], gen: { crates: 2, lasers: 1, colors: 2, w: 7, h: 6, tries: 2000 }, tip: 'The beam must stay lit while you finish.' },
-      { name: 'Kaleidoscope', difficulty: 4, par: [34, 72], gen: { crates: 3, colors: 3, lasers: 1, w: 7, h: 6, tries: 2000 }, tip: 'Everything shines, nothing stays still.' },
-      { name: 'The Crystal Heart', difficulty: 5, par: [40, 110], gen: { crates: 2, lasers: 2, colors: 2, w: 7, h: 7, tries: 3000, states: 1500000 }, tip: 'Light every crystal and fill every pad.' },
+      { name: 'Kaleidoscope', difficulty: 4, par: [30, 72], gen: { crates: 2, colors: 2, lasers: 1, w: 6, h: 6, tries: 1500 }, tip: 'Everything shines, nothing stays still.' },
+      { name: 'The Crystal Heart', difficulty: 5, par: [36, 110], gen: { crates: 3, lasers: 1, colors: 3, w: 7, h: 6, tries: 1500 }, tip: 'Light every crystal and fill every pad.' },
     ],
   },
   clockwork: {
