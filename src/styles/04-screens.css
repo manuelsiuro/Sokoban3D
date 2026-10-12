@@ -1,0 +1,215 @@
+/* ------------------------------------------------------------ full screens */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(20px, env(safe-area-inset-top)) 16px 24px;
+  background: linear-gradient(180deg, rgba(220, 235, 250, 0.85), rgba(200, 222, 245, 0.92));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: fade 0.3s var(--ease);
+}
+
+.screen.leaving {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.screen-inner {
+  width: min(880px, 100%);
+}
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.screen-head h2 {
+  flex: 1;
+  margin: 0;
+  font: 700 clamp(30px, 6vw, 44px) var(--font-display);
+}
+
+/* Level cards: number, badge, name, difficulty pips, stars, best or lock hint. */
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.level-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 22px;
+  text-align: left;
+  color: white;
+  background: linear-gradient(150deg, #4b98ec, #2a5fb8);
+  box-shadow: 0 14px 30px -12px rgba(30, 80, 160, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  animation: card-in 0.4s var(--spring) backwards;
+}
+
+.level-card.locked {
+  background: linear-gradient(150deg, #a7b4c4, #8392a5);
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.level-num {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  font: 700 22px var(--font-display);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.level-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.level-name {
+  margin-top: 4px;
+  font: 600 22px var(--font-display);
+}
+
+.level-diff {
+  display: flex;
+  gap: 4px;
+}
+
+.level-diff i {
+  width: 14px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.level-diff i.on {
+  background: white;
+}
+
+.level-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.level-stars i {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.level-stars i.on {
+  color: #ffd34d;
+}
+
+.level-stars i.on .ic {
+  fill: #ffd34d;
+}
+
+.level-best {
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* Phones: two compact cards a row. */
+@media (max-width: 480px) {
+  .level-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .level-card {
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .level-name {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 17px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+/* A sideways row of cards (see carousel() in ui/dom.ts): arrows for the mouse. */
+.carousel {
+  position: relative;
+  min-width: 0;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow);
+  transform: translateY(-50%);
+}
+
+.carousel-arrow.prev {
+  left: 10px;
+}
+
+.carousel-arrow.next {
+  right: 10px;
+}
+
+.carousel-arrow[disabled] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (hover: none) {
+  .carousel-arrow {
+    display: none;
+  }
+}
+
+/* World sections in the level list. */
+.world-section {
+  margin-bottom: 26px;
+}
+
+.world-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 12px;
+  font: 700 24px var(--font-display);
+}
+
+.world-section h3 small {
+  font: 500 14px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.world-soon {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.5);
+}

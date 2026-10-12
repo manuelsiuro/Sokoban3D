@@ -1,0 +1,23 @@
+ok   a push moves the crate, three moves solve First Push
+ok   the winning move has the win event
+ok   two crates in a row are too heavy
+ok   a crate against a wall does not move
+ok   walls stop the player
+ok   pushing a crate off a goal and onto another
+ok   the player climbs one level
+ok   then one more level up
+ok   a two-level wall of terrain blocks
+ok   the player steps down one level at a time
+ok   a crate pushed off a ledge falls to the floor below
+ok   a crate one level down is a step: walk onto it
+ok   a crate in a dip fills it: walk across
+ok   a crate pushed onto another stacks on it
+ok   a crate with another on top is too heavy to push
+ok   a crate one level below is floor: the player walks onto it
+ok   baseline push on open ground
+ok   a crate pushed into the void is lost
+ok   the player never walks into the void
+ok   redo and replaying the same move keep the record
+ok   a different move after undo replaces the moves after it
+moves after replace: "rRRl"
+ok   restart goes back to the first state

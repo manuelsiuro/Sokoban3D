@@ -1,0 +1,25 @@
+/** The campaign's shape: unique ids, each world's levels together and in world order, difficulty never drops inside a world. */
+import { LEVELS } from '../src/levels/levels';
+import { WORLDS } from '../src/levels/worlds';
+import { check } from './assert';
+
+const ids = new Set<string>();
+const order = WORLDS.map((w) => w.id);
+let world = -1;
+let d = 0;
+for (const l of LEVELS) {
+  check(!ids.has(l.id), `unique id ${l.id}`);
+  ids.add(l.id);
+  const w = order.indexOf(l.world);
+  check(w >= 0, `${l.id}: unknown world ${l.world}`);
+  check(w >= world, `${l.id}: world ${l.world} out of order`);
+  if (w !== world) d = 0;
+  world = w;
+  check(l.difficulty >= d && l.difficulty <= 5, `${l.id}: difficulty ${l.difficulty} after ${d}`);
+  d = l.difficulty;
+  check(l.tip.length > 0, `${l.id}: a tip`);
+}
+for (const w of WORLDS) {
+  const ls = LEVELS.filter((l) => l.world === w.id);
+  console.log(`${w.id.padEnd(10)} ${String(ls.length).padStart(2)} levels  difficulty ${ls.map((l) => l.difficulty).join(' ') || '-'}`);
+}

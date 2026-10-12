@@ -1,0 +1,10 @@
+OK   meadow-1       par   3 pushes   2 crates 1  ★★ ≤4 ★★★ ≤3
+OK   meadow-2       par   5 pushes   2 crates 1  ★★ ≤7 ★★★ ≤5
+OK   meadow-3       par   6 pushes   3 crates 2  ★★ ≤9 ★★★ ≤6
+OK   meadow-4       par   6 pushes   3 crates 2  ★★ ≤9 ★★★ ≤6
+OK   meadow-5       par  11 pushes   3 crates 2  ★★ ≤16 ★★★ ≤12
+OK   meadow-6       par  16 pushes   4 crates 2  ★★ ≤24 ★★★ ≤17
+OK   meadow-7       par  25 pushes   7 crates 3  ★★ ≤37 ★★★ ≤27
+OK   meadow-8       par  34 pushes  10 crates 2  ★★ ≤51 ★★★ ≤37
+OK   meadow-9       par  54 pushes  20 crates 3  ★★ ≤81 ★★★ ≤59
+OK   meadow-10      par  84 pushes  34 crates 4  ★★ ≤126 ★★★ ≤92
