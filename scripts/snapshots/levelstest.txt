@@ -48,3 +48,13 @@ OK   forge-7        par  42 pushes  15 crates 3  ★★ ≤63 ★★★ ≤46
 OK   forge-8        par  36 pushes  13 crates 4  ★★ ≤54 ★★★ ≤39
 OK   forge-9        par  47 pushes  21 crates 5  ★★ ≤70 ★★★ ≤51
 OK   forge-10       par  58 pushes  20 crates 5  ★★ ≤87 ★★★ ≤63
+OK   crystal-1      par  13 pushes   6 crates 1  ★★ ≤19 ★★★ ≤14
+OK   crystal-2      par  17 pushes   8 crates 2  ★★ ≤25 ★★★ ≤18
+OK   crystal-3      par  19 pushes   7 crates 2  ★★ ≤28 ★★★ ≤20
+OK   crystal-4      par  28 pushes  12 crates 3  ★★ ≤42 ★★★ ≤30
+OK   crystal-5      par  29 pushes   9 crates 3  ★★ ≤43 ★★★ ≤31
+OK   crystal-6      par  40 pushes  19 crates 3  ★★ ≤60 ★★★ ≤44
+OK   crystal-7      par  31 pushes  11 crates 3  ★★ ≤46 ★★★ ≤34
+OK   crystal-8      par  39 pushes  10 crates 3  ★★ ≤58 ★★★ ≤42
+OK   crystal-9      par  46 pushes  20 crates 3  ★★ ≤69 ★★★ ≤50
+OK   crystal-10     par  41 pushes  11 crates 3  ★★ ≤61 ★★★ ≤45
