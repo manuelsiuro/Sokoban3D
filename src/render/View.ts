@@ -392,10 +392,11 @@ export class View {
     this.player.suit.color.set(outfit.suit);
   }
 
-  /** Behind the title screen the camera orbits slowly; in play it settles on a quarter turn. */
+  /** Behind the title screen the camera orbits slowly; in play it turns back to north-up. */
   set idle(on: boolean) {
     this.orbiting = on;
-    if (!on) this.yaw = Math.round(this.yaw);
+    // Back to the level's own heading (north up), so the arrows match the map as designed.
+    if (!on) this.yaw = Math.round(this.yaw / 4) * 4;
   }
 
   private ghost: THREE.Group | null = null;
