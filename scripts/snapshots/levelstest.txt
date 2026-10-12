@@ -38,3 +38,13 @@ OK   sky-7          par  36 pushes  15 crates 3  ★★ ≤54 ★★★ ≤39
 OK   sky-8          par  41 pushes   9 crates 3  ★★ ≤61 ★★★ ≤45
 OK   sky-9          par  40 pushes  17 crates 3  ★★ ≤60 ★★★ ≤44
 OK   sky-10         par  47 pushes  14 crates 3  ★★ ≤70 ★★★ ≤51
+OK   forge-1        par  11 pushes   4 crates 1  ★★ ≤16 ★★★ ≤12
+OK   forge-2        par   9 pushes   5 crates 2  ★★ ≤13 ★★★ ≤9
+OK   forge-3        par  26 pushes  10 crates 2  ★★ ≤39 ★★★ ≤28
+OK   forge-4        par  20 pushes   8 crates 3  ★★ ≤30 ★★★ ≤22
+OK   forge-5        par  33 pushes  13 crates 2  ★★ ≤49 ★★★ ≤36
+OK   forge-6        par  44 pushes  15 crates 4  ★★ ≤66 ★★★ ≤48
+OK   forge-7        par  42 pushes  15 crates 3  ★★ ≤63 ★★★ ≤46
+OK   forge-8        par  36 pushes  13 crates 4  ★★ ≤54 ★★★ ≤39
+OK   forge-9        par  47 pushes  21 crates 5  ★★ ≤70 ★★★ ≤51
+OK   forge-10       par  58 pushes  20 crates 5  ★★ ≤87 ★★★ ≤63
