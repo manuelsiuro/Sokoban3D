@@ -17,6 +17,26 @@ ok   a crate one level below is floor: the player walks onto it
 ok   baseline push on open ground
 ok   a crate pushed into the void is lost
 ok   the player never walks into the void
+ok   a crate slides across ice and stops on the floor after it
+ok   a crate slides until a wall stops it
+ok   the player slides too, off the ice onto the floor
+ok   a sliding player stops before a crate (no push)
+ok   a crate pushed into a pit fills it
+ok   the filled pit is floor again
+ok   the player never walks into open lava
+ok   a closed door blocks a crate
+ok   a plate opens its door while held; a crate pushed in keeps it open
+ok   stepping on the plate opens the door
+ok   a conveyor carries the player after the move
+ok   a conveyor carries a crate pushed onto it
+ok   a crate pushed onto a pad comes out of the other
+ok   nothing comes out of a pad that is taken
+ok   a g gate is up at the start (even moves)
+ok   a G gate is down on even moves, up on odd ones, never on someone
+ok   ...and up after the player leaves it on an odd move
+ok   a mirror crate turns the beam onto the receiver
+ok   a plain crate blocks the beam
+ok   a colored goal wants its color
 ok   redo and replaying the same move keep the record
 ok   a different move after undo replaces the moves after it
 moves after replace: "rRRl"

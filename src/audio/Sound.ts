@@ -100,6 +100,23 @@ export class Sound {
     this.tone(660, 990, 0.18, 'triangle', 0.18);
     this.tone(990, 1320, 0.22, 'sine', 0.1, 0.06);
   }
+  slide() {
+    this.hiss(2400, 0.28, 0.12, 0.7, 'highpass');
+  }
+  teleport() {
+    this.tone(300, 1400, 0.25, 'sine', 0.15);
+    this.tone(450, 2100, 0.2, 'triangle', 0.08, 0.05);
+  }
+  fill() {
+    this.hiss(180, 0.35, 0.4);
+    this.tone(140, 50, 0.3, 'sine', 0.25);
+  }
+  convey() {
+    this.tone(220, 200, 0.08, 'square', 0.05);
+  }
+  door(open: boolean) {
+    this.tone(open ? 260 : 340, open ? 400 : 200, 0.18, 'sawtooth', 0.06);
+  }
   win() {
     [523, 659, 784, 1047, 1319].forEach((f, k) => this.tone(f, f, 0.22, 'triangle', 0.2, k * 0.09));
   }

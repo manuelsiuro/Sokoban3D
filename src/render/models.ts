@@ -115,8 +115,8 @@ export function wallModel(b: Biome, seed: number): THREE.Object3D {
       break;
     }
     case 'ice':
-      g.add(mesh(new RoundedBoxGeometry(0.96, 1, 0.96, 1, 0.05), mat(b.wallColor, { rough: 0.15, metal: 0.1 }), 0, 0.5, 0));
-      g.add(mesh(new RoundedBoxGeometry(0.98, 0.12, 0.98, 1, 0.05), top, 0, 1.02, 0));
+      g.add(mesh(new RoundedBoxGeometry(0.96, 0.6, 0.96, 1, 0.06), mat(b.wallColor, { rough: 0.6, flat: true }), 0, 0.3, 0));
+      g.add(mesh(new RoundedBoxGeometry(1, 0.14, 1, 1, 0.06), top, 0, 0.64, 0));
       break;
     case 'cloud': {
       const puff = new THREE.IcosahedronGeometry(0.38, 1);
@@ -124,17 +124,18 @@ export function wallModel(b: Biome, seed: number): THREE.Object3D {
       break;
     }
     case 'crystal': {
-      g.add(mesh(new RoundedBoxGeometry(0.96, 0.6, 0.96, 1, 0.05), mat(b.soil), 0, 0.3, 0));
-      const c = mesh(new THREE.OctahedronGeometry(0.35, 0), mat(b.wallTop, { rough: 0.2, emissive: b.wallColor, emissiveIntensity: 0.35, flat: true }), 0, 0.85, 0);
-      c.scale.y = 1.4;
+      g.add(mesh(new RoundedBoxGeometry(0.96, 0.45, 0.96, 1, 0.05), mat(b.soil), 0, 0.22, 0));
+      const c = mesh(new THREE.OctahedronGeometry(0.3, 0), mat(b.wallTop, { rough: 0.2, emissive: b.wallColor, emissiveIntensity: 0.35, flat: true }), 0, 0.85, 0);
+      c.scale.y = 1.2;
+      c.position.y = 0.7;
       c.rotation.y = seed;
       g.add(c);
       break;
     }
     default:
       // Stone, sandstone, basalt, brass: a block with a lighter cap.
-      g.add(mesh(new RoundedBoxGeometry(0.98, 0.86, 0.98, 1, 0.06), side, 0, 0.43, 0));
-      g.add(mesh(new RoundedBoxGeometry(1, 0.16, 1, 1, 0.05), top, 0, 0.92, 0));
+      g.add(mesh(new RoundedBoxGeometry(0.98, 0.6, 0.98, 1, 0.06), side, 0, 0.3, 0));
+      g.add(mesh(new RoundedBoxGeometry(1, 0.14, 1, 1, 0.05), top, 0, 0.66, 0));
   }
   return g;
 }

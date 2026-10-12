@@ -8,3 +8,13 @@ OK   meadow-7       par  25 pushes   7 crates 3  ★★ ≤37 ★★★ ≤27
 OK   meadow-8       par  34 pushes  10 crates 2  ★★ ≤51 ★★★ ≤37
 OK   meadow-9       par  54 pushes  20 crates 3  ★★ ≤81 ★★★ ≤59
 OK   meadow-10      par  84 pushes  34 crates 4  ★★ ≤126 ★★★ ≤92
+OK   tundra-1       par  10 pushes   5 crates 1  ★★ ≤15 ★★★ ≤11
+OK   tundra-2       par  13 pushes   4 crates 1  ★★ ≤19 ★★★ ≤14
+OK   tundra-3       par  21 pushes   6 crates 2  ★★ ≤31 ★★★ ≤23
+OK   tundra-4       par  21 pushes   8 crates 2  ★★ ≤31 ★★★ ≤23
+OK   tundra-5       par  21 pushes  11 crates 2  ★★ ≤31 ★★★ ≤23
+OK   tundra-6       par  27 pushes   8 crates 3  ★★ ≤40 ★★★ ≤29
+OK   tundra-7       par  41 pushes  14 crates 3  ★★ ≤61 ★★★ ≤45
+OK   tundra-8       par  39 pushes  13 crates 3  ★★ ≤58 ★★★ ≤42
+OK   tundra-9       par  73 pushes  19 crates 3  ★★ ≤109 ★★★ ≤80
+OK   tundra-10      par  63 pushes  18 crates 4  ★★ ≤94 ★★★ ≤69

@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { LevelDef } from '../levels/types';
-import { DX, DY, VOID, type Grid } from '../sim/grid';
+import { DX, DY, TILE, VOID, type Grid } from '../sim/grid';
 import { EVENT, type GameState } from '../sim/Sim';
 import { rng } from '../sim/rng';
 import { biomeOf, type Biome } from '../world/biomes';
 import { skyTexture } from './sky';
+import { CRATE_COLORS, Mechanics, dressCrate, tileColor } from './mechanics';
 import { CRATE, crateModel, decorModel, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
 
 /** World height of one level (a crate's height, so a crate in a dip is flush with the floor). */
@@ -49,6 +50,9 @@ export class View {
   private halfSpan = 5;
   private crates: { group: THREE.Group; panels: THREE.MeshStandardMaterial; tween: Tween | null; lost: boolean }[] = [];
   private goals: { cell: number; glow: THREE.MeshStandardMaterial }[] = [];
+  private mech: Mechanics | null = null;
+  /** Each crate's tween is a pop (scale down and up) instead of a slide: it teleported. */
+  private pops = new Set<number>();
   private player = playerModel();
   private playerTween: Tween | null = null;
   private hop = 0.1;
@@ -134,6 +138,7 @@ export class View {
       return false;
     };
     const tiles: [THREE.BufferGeometry[], THREE.BufferGeometry[]] = [[], []];
+    const special = new Map<string, { geos: THREE.BufferGeometry[]; m: THREE.Material }>();
     const soil: THREE.BufferGeometry[] = [];
     const rock: THREE.BufferGeometry[] = [];
     const island: [number, number, number][] = [];
@@ -150,7 +155,13 @@ export class View {
         const wx = x - (grid.w - 1) / 2;
         const wz = y - (grid.h - 1) / 2;
         const top = z * LEVEL_H;
-        tiles[(x + y) & 1].push(tileGeometry.clone().translate(wx, top - 0.15, wz));
+        const look = isSolid ? tileColor(grid, c) : null;
+        const tile = tileGeometry.clone().translate(wx, top - 0.15, wz);
+        if (look) {
+          const k = `${look.color}`;
+          if (!special.has(k)) special.set(k, { geos: [], m: mat(look.color, look.opts) });
+          special.get(k)!.geos.push(tile);
+        } else tiles[(x + y) & 1].push(tile);
         const colH = top + 0.5;
         if (colH > 0.01) soil.push(new THREE.BoxGeometry(1, colH, 1).translate(wx, top - 0.3 - colH / 2 + 0.02, wz));
       }
@@ -181,6 +192,7 @@ export class View {
     };
     add(tiles[0], mat(b.ground, { rough: 0.95 }));
     add(tiles[1], mat(b.ground2, { rough: 0.95 }));
+    for (const { geos, m } of special.values()) add(geos, m);
     add(soil, mat(b.soil, { rough: 1 }), true);
     add(rock, mat(b.rock, { rough: 1, flat: true }), true);
 
@@ -193,11 +205,18 @@ export class View {
       }
       if (grid.goal[c]) {
         const { group, glow } = goalModel(b);
+        if (grid.goalColor[c]) {
+          glow.color.set(CRATE_COLORS[grid.goalColor[c]]);
+          glow.emissive.set(CRATE_COLORS[grid.goalColor[c]]);
+        }
         this.pos(c, grid.floor[c], group.position);
         this.world.add(group);
         this.goals.push({ cell: c, glow });
       }
     }
+    if (this.mech) this.scene.remove(this.mech.group);
+    this.mech = new Mechanics(grid, (c, z, out) => this.pos(c, z, out), LEVEL_H);
+    this.scene.add(this.mech.group);
     for (const [x, y, z] of island) {
       if (solid(x, y) || R.next() > 0.45) continue;
       const d = decorModel(R.pick(b.decor), b, R.next);
@@ -226,6 +245,8 @@ export class View {
     // Crates.
     for (let k = 0; k < grid.crates.length; k++) {
       const c = crateModel(b);
+      dressCrate(c.group, c.panels, grid.crateKind[k]);
+      c.panels.userData.base = c.panels.color.getHex();
       this.scene.add(c.group);
       this.crates.push({ ...c, tween: null, lost: false });
     }
@@ -261,6 +282,17 @@ export class View {
     this.t0 = this.now;
     const falls = s.events & (EVENT.fall | EVENT.lost);
     this.dur = animate && prev && falls && s.moves > prev.moves ? FALL_T : MOVE_T;
+    // Slides and conveyor rides cover more ground: a little longer per extra cell.
+    if (animate && prev) {
+      const g = this.grid;
+      const far = (a: number, b: number) => (a < 0 || b < 0 ? 0 : Math.abs((a % g.w) - (b % g.w)) + Math.abs(Math.floor(a / g.w) - Math.floor(b / g.w)));
+      const dist = Math.max(far(prev.cell, s.cell), ...s.crates.map((c, k) => far(prev.crates[k].cell, c.cell)));
+      if (dist > 1 && !(s.events & EVENT.teleport)) this.dur = Math.min(0.5, this.dur + (dist - 1) * 0.07);
+    }
+    const teleported = animate && (s.events & EVENT.teleport) !== 0;
+    const onPad = (c: number) => c >= 0 && this.grid!.tile[c] === TILE.teleport;
+    this.pops.clear();
+    if (teleported) this.dur = 0.3;
     s.crates.forEach((c, k) => {
       const view = this.crates[k];
       const to = c.cell < 0 ? null : this.pos(c.cell, c.z).add(new THREE.Vector3(0, CRATE / 2, 0));
@@ -283,6 +315,10 @@ export class View {
       }
       view.lost = false;
       view.group.visible = true;
+      // A crate sunk in lava has cooled to stone.
+      const cooled = this.grid!.tile[c.cell] === TILE.lava && c.z === this.grid!.floor[c.cell];
+      view.panels.color.set(cooled ? 0x4a4048 : view.panels.userData.base);
+      if (teleported && was && onPad(c.cell) && was.cell !== c.cell) this.pops.add(k);
       if (animate && was && was.cell >= 0 && (was.cell !== c.cell || was.z !== c.z)) {
         const from = this.pos(was.cell, was.z).add(new THREE.Vector3(0, CRATE / 2, 0));
         view.tween = { from, to, drop: c.z < was.z };
@@ -292,6 +328,7 @@ export class View {
       }
     });
     const pTo = this.pos(s.cell, s.z);
+    if (teleported && prev && onPad(s.cell) && prev.cell !== s.cell) this.pops.add(-1);
     if (animate && prev && prev.cell !== s.cell) {
       this.playerTween = { from: this.pos(prev.cell, prev.z), to: pTo, drop: false };
       this.hop = s.z > prev.z ? 0.45 : s.z < prev.z ? 0.25 : 0.08;
@@ -313,6 +350,7 @@ export class View {
         if (c && c.cell >= 0) this.burst(this.pos(c.cell, c.z).add(new THREE.Vector3(0, 0.3, 0)), this.biome.goal, 14, 2.2);
       }
     }
+    this.mech?.setState(s);
     if (s.solved && (!prev || !prev.solved) && prev) this.wonAt = this.now;
     if (!s.solved) this.wonAt = -1;
     this.state = s;
@@ -385,8 +423,12 @@ export class View {
         const slide = Math.min(1, t / 0.45);
         const fall = Math.max(0, (t - 0.45) / 0.55);
         c.group.position.set(from.x + (to.x - from.x) * slide, from.y + (to.y - from.y) * fall * fall, from.z + (to.z - from.z) * slide);
+      } else if (this.pops.has(this.crates.indexOf(c))) {
+        c.group.position.copy(t < 0.5 ? from : to);
+        c.group.scale.setScalar(Math.max(0.05, Math.abs(1 - 2 * t)));
       } else c.group.position.lerpVectors(from, to, ease);
       if (t >= 1) {
+        c.group.scale.setScalar(1);
         c.group.position.copy(to);
         c.tween = null;
         if (c.lost) c.group.visible = false;
@@ -396,10 +438,16 @@ export class View {
     const p = this.player;
     if (this.playerTween) {
       const { from, to } = this.playerTween;
-      p.group.position.lerpVectors(from, to, ease);
-      const climbing = to.y !== from.y;
-      p.group.position.y = (climbing ? from.y + (to.y - from.y) * Math.min(1, t * 1.6) : from.y) + Math.sin(Math.PI * t) * this.hop;
+      if (this.pops.has(-1)) {
+        p.group.position.copy(t < 0.5 ? from : to);
+        p.group.scale.setScalar(Math.max(0.05, Math.abs(1 - 2 * t)));
+      } else {
+        p.group.position.lerpVectors(from, to, ease);
+        const climbing = to.y !== from.y;
+        p.group.position.y = (climbing ? from.y + (to.y - from.y) * Math.min(1, t * 1.6) : from.y) + Math.sin(Math.PI * t) * this.hop;
+      }
       if (t >= 1) {
+        p.group.scale.setScalar(1);
         p.group.position.copy(to);
         this.playerTween = null;
       }
@@ -431,6 +479,7 @@ export class View {
         c.panels.emissiveIntensity = on ? 0.35 : 0;
       });
     }
+    this.mech?.update(time, dt);
     // Particles.
     for (let k = this.particles.length - 1; k >= 0; k--) {
       const q = this.particles[k];

@@ -1,5 +1,5 @@
 import type { LevelDef } from '../levels/types';
-import { DIRS, DX, DY, VOID, parseLevel, type Grid } from './grid';
+import { DIRS, DX, DY, KIND, TILE, VOID, parseLevel, type Grid } from './grid';
 
 /**
  * The game's rules, deterministic and turn-based: the state after move n depends only on
@@ -11,6 +11,11 @@ import { DIRS, DX, DY, VOID, parseLevel, type Grid } from './grid';
  * floor plus its crates. The player stands on surfaces, steps up or down one level, and
  * pushes a crate that sits at its own level (never one with another crate on top). A
  * pushed crate slides sideways at that level, then falls to the surface below it.
+ *
+ * A move, in order: the step or push (a crate slides on across ice, drops into pits and
+ * lava, comes out of a teleporter), the player's own slide and teleport, then conveyors
+ * carry what stands on them. Doors, gates, lasers and receivers are never stored: they are
+ * worked out from the state (`worldOf`), so undo and the solver stay exact.
  */
 
 /** What happened during a move (sound, particles and animation read these). */
@@ -21,16 +26,26 @@ export const EVENT = {
   climb: 4,
   /** The player stepped down a level. */
   descend: 8,
-  /** A pushed crate fell to a lower surface. */
+  /** A crate fell to a lower surface. */
   fall: 16,
-  /** A pushed crate fell off the island. */
+  /** A crate fell off the island. */
   lost: 32,
-  /** A crate landed on a goal. */
+  /** A goal got covered. */
   goalOn: 64,
-  /** A crate left a goal. */
+  /** A goal got uncovered. */
   goalOff: 128,
-  /** Every goal is covered. */
+  /** Everything is solved. */
   win: 256,
+  /** Something slid across ice. */
+  slide: 512,
+  teleport: 1024,
+  /** A crate filled a pit or sank into lava. */
+  fill: 2048,
+  /** A conveyor carried something. */
+  convey: 4096,
+  /** A door opened or closed. */
+  open: 8192,
+  close: 16384,
 } as const;
 
 /**
@@ -44,6 +59,20 @@ export interface CrateState {
   /** Cell index (y * w + x), or -1 once it fell off the island. */
   cell: number;
   z: number;
+  kind: number;
+}
+
+/** What the state implies for the switches and lasers. */
+export interface World {
+  /** Channel 1–3 is on (a plate held down or a receiver lit). Index 0 is unused. */
+  on: boolean[];
+  /** Receivers hit by a beam. */
+  lit: number[];
+  /** Each beam's path: the cells it crosses from its emitter, its direction in each, and whether something stopped it (rather than a receiver or the map's edge). */
+  beams: { cells: number[]; dirs: number[]; blocked: boolean }[];
+  /** Doors standing open and gates standing raised. */
+  open: number[];
+  raised: number[];
 }
 
 export interface GameState {
@@ -60,6 +89,7 @@ export interface GameState {
   /** The crate pushed by the last move, or -1. */
   pushed: number;
   crates: CrateState[];
+  world: World;
 }
 
 /** The surface height at a cell: its floor plus the crates stacked on it. */
@@ -76,9 +106,92 @@ function crateAt(b: Int16Array, cell: number, z: number) {
   return -1;
 }
 
-/** A goal is covered when a crate sits on its floor. */
+const occupied = (b: Int16Array, cell: number) => {
+  if (b[S.cell] === cell) return true;
+  for (let k = HEAD; k < b.length; k += 2) if (b[k] === cell) return true;
+  return false;
+};
+
+/** A pit or lava cell nothing has filled yet: the player can't go in. */
+const isHole = (g: Grid, b: Int16Array, cell: number) => (g.tile[cell] === TILE.pit || g.tile[cell] === TILE.lava) && surface(g, b, cell) === g.floor[cell];
+
+const gateUp = (g: Grid, moves: number, cell: number) => (g.tile[cell] === TILE.gateEven && moves % 2 === 0) || (g.tile[cell] === TILE.gateOdd && moves % 2 === 1);
+
+/** A goal is covered by a crate on its floor, of its color if it has one. */
 function covered(g: Grid, b: Int16Array, cell: number) {
-  return crateAt(b, cell, g.floor[cell]) >= 0;
+  const k = crateAt(b, cell, g.floor[cell]);
+  if (k < 0) return false;
+  return g.goalColor[cell] === 0 || g.crateKind[k] === g.goalColor[cell];
+}
+
+export function neighbour(g: Grid, cell: number, dir: number) {
+  const x = (cell % g.w) + DX[dir];
+  const y = Math.floor(cell / g.w) + DY[dir];
+  return x < 0 || y < 0 || x >= g.w || y >= g.h ? -1 : y * g.w + x;
+}
+
+const MIRROR_SLASH = [1, 0, 3, 2];
+const MIRROR_BACK = [3, 2, 1, 0];
+
+/** Plates, receivers and beams, and the doors and gates they imply. */
+export function worldOf(g: Grid, b: Int16Array): World {
+  const on = [false, false, false, false];
+  for (const c of g.plates) if ((b[S.cell] === c && b[S.z] === g.floor[c]) || crateAt(b, c, g.floor[c]) >= 0) on[g.param[c]] = true;
+  const lit: number[] = [];
+  const beams: World['beams'] = [];
+  for (const e of g.emitters) {
+    const level = g.floor[e];
+    let dir = g.param[e];
+    let cell = e;
+    const cells = [e];
+    const dirs = [dir];
+    let blocked = true;
+    for (let n = 0; n < g.w * g.h * 4; n++) {
+      const next = neighbour(g, cell, dir);
+      if (next < 0) {
+        blocked = false;
+        break;
+      }
+      if (g.wall[next] || g.tile[next] === TILE.emitter) break;
+      if (g.tile[next] === TILE.receiver) {
+        if (!lit.includes(next)) lit.push(next);
+        cells.push(next);
+        dirs.push(dir);
+        blocked = false;
+        break;
+      }
+      if (g.floor[next] !== VOID && g.floor[next] > level) break;
+      const k = crateAt(b, next, level);
+      if (k >= 0) {
+        const kind = g.crateKind[k];
+        if (kind !== KIND.mirrorSlash && kind !== KIND.mirrorBack) break;
+        dir = (kind === KIND.mirrorSlash ? MIRROR_SLASH : MIRROR_BACK)[dir];
+      }
+      cell = next;
+      cells.push(cell);
+      dirs.push(dir);
+    }
+    beams.push({ cells, dirs, blocked });
+  }
+  for (const r of lit) on[g.param[r]] = true;
+  const open: number[] = [];
+  const raised: number[] = [];
+  for (let c = 0; c < g.tile.length; c++) {
+    const t = g.tile[c];
+    if (t === TILE.door && (on[g.param[c]] || occupied(b, c))) open.push(c);
+    if ((t === TILE.gateEven || t === TILE.gateOdd) && gateUp(g, b[S.moves], c) && !occupied(b, c)) raised.push(c);
+  }
+  return { on, lit, beams, open, raised };
+}
+
+/** Something can't enter this cell at all (walls, emitters, receivers, closed doors, raised gates). */
+function blocked(g: Grid, b: Int16Array, on: boolean[], cell: number) {
+  if (cell < 0 || g.wall[cell]) return true;
+  const t = g.tile[cell];
+  if (t === TILE.emitter || t === TILE.receiver) return true;
+  if (t === TILE.door) return !on[g.param[cell]] && !occupied(b, cell);
+  if (t === TILE.gateEven || t === TILE.gateOdd) return gateUp(g, b[S.moves], cell) && !occupied(b, cell);
+  return false;
 }
 
 export function initialState(g: Grid): Int16Array {
@@ -91,23 +204,122 @@ export function initialState(g: Grid): Int16Array {
     b[HEAD + k * 2] = c;
     b[HEAD + k * 2 + 1] = g.floor[c];
   });
-  b[S.solved] = g.goals.every((c) => covered(g, b, c)) ? 1 : 0;
+  b[S.solved] = isWon(g, b) ? 1 : 0;
   return b;
 }
 
-/** The neighbour of a cell in a direction, or -1 off the map. */
-export function neighbour(g: Grid, cell: number, dir: number) {
-  const x = (cell % g.w) + DX[dir];
-  const y = Math.floor(cell / g.w) + DY[dir];
-  return x < 0 || y < 0 || x >= g.w || y >= g.h ? -1 : y * g.w + x;
+const isWon = (g: Grid, b: Int16Array) => g.goals.every((c) => covered(g, b, c)) && (g.receivers.length === 0 || worldOf(g, b).lit.length === g.receivers.length);
+
+/**
+ * Moves crate k into `cell` (where it falls to the surface), then lets it slide on across
+ * ice and come out of a teleporter. Returns the events.
+ */
+function placeCrate(g: Grid, b: Int16Array, on: boolean[], k: number, cell: number, dir: number, slide: boolean): number {
+  const i = HEAD + k * 2;
+  let ev = 0;
+  for (let n = 0; n < g.w * g.h; n++) {
+    if (g.floor[cell] === VOID) {
+      b[i] = -1;
+      b[i + 1] = 0;
+      return ev | EVENT.lost;
+    }
+    const from = b[i + 1];
+    const land = surface(g, b, cell);
+    b[i] = cell;
+    b[i + 1] = land;
+    if (land < from) ev |= EVENT.fall;
+    if ((g.tile[cell] === TILE.pit || g.tile[cell] === TILE.lava) && land === g.floor[cell]) return ev | EVENT.fill;
+    if (!slide || g.tile[cell] !== TILE.ice || land !== g.floor[cell]) break;
+    // On ice: on to the next cell, if there's room at this level.
+    const next = neighbour(g, cell, dir);
+    if (next < 0 || blocked(g, b, on, next) || b[S.cell] === next) break;
+    if (g.floor[next] !== VOID && surface(g, b, next) > land) break;
+    ev |= EVENT.slide;
+    cell = next;
+  }
+  const pad = b[i];
+  const z = b[i + 1];
+  if (g.tile[pad] === TILE.teleport && z === g.floor[pad]) {
+    const out = g.partner[pad];
+    if (out >= 0 && !occupied(b, out) && !blocked(g, b, on, out)) {
+      b[i] = out;
+      b[i + 1] = g.floor[out];
+      ev |= EVENT.teleport;
+    }
+  }
+  return ev;
+}
+
+/** The player slides across ice (stopping before anything in the way), then may teleport. */
+function settlePlayer(g: Grid, b: Int16Array, on: boolean[], dir: number): number {
+  let ev = 0;
+  for (let n = 0; n < g.w * g.h; n++) {
+    const cell = b[S.cell];
+    const z = b[S.z];
+    if (g.tile[cell] !== TILE.ice || z !== g.floor[cell]) break;
+    const next = neighbour(g, cell, dir);
+    if (next < 0 || blocked(g, b, on, next) || g.floor[next] === VOID || crateAt(b, next, z) >= 0 || isHole(g, b, next)) break;
+    const s = surface(g, b, next);
+    if (s > z || s < z - 1) break;
+    b[S.cell] = next;
+    b[S.z] = s;
+    ev |= EVENT.slide;
+  }
+  const pad = b[S.cell];
+  if (g.tile[pad] === TILE.teleport && b[S.z] === g.floor[pad]) {
+    const out = g.partner[pad];
+    if (out >= 0 && !occupied(b, out) && !blocked(g, b, on, out)) {
+      b[S.cell] = out;
+      b[S.z] = g.floor[out];
+      ev |= EVENT.teleport;
+    }
+  }
+  return ev;
+}
+
+/** Conveyors carry what stands on them one cell, each thing at most once a move. */
+function convey(g: Grid, b: Int16Array, on: boolean[]): number {
+  if (g.conveyors.length === 0) return 0;
+  let ev = 0;
+  const moved = new Set<number>();
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const c of g.conveyors) {
+      const dir = g.param[c];
+      const z = g.floor[c];
+      const to = neighbour(g, c, dir);
+      if (to < 0 || blocked(g, b, on, to)) continue;
+      if (b[S.cell] === c && b[S.z] === z && !moved.has(-1)) {
+        if (g.floor[to] === VOID || crateAt(b, to, z) >= 0 || isHole(g, b, to)) continue;
+        const s = surface(g, b, to);
+        if (s > z || s < z - 1) continue;
+        b[S.cell] = to;
+        b[S.z] = s;
+        moved.add(-1);
+        changed = true;
+        ev |= EVENT.convey;
+        continue;
+      }
+      const k = crateAt(b, c, z);
+      // Never from under the player or another crate, never into the player.
+      if (k < 0 || moved.has(k) || crateAt(b, c, z + 1) >= 0 || b[S.cell] === c || b[S.cell] === to) continue;
+      if (g.floor[to] !== VOID && surface(g, b, to) > z) continue;
+      ev |= placeCrate(g, b, on, k, to, dir, false) | EVENT.convey;
+      moved.add(k);
+      changed = true;
+    }
+  }
+  return ev;
 }
 
 /** One move. Returns the new state, or null when the move is blocked (nothing changes). */
 export function step(g: Grid, prev: Int16Array, dir: number): Int16Array | null {
+  const before = worldOf(g, prev);
+  const on = before.on;
   const from = prev[S.cell];
   const e = prev[S.z];
   const to = neighbour(g, from, dir);
-  if (to < 0 || g.wall[to] || g.floor[to] === VOID) return null;
+  if (to < 0 || g.floor[to] === VOID || blocked(g, prev, on, to)) return null;
   const b = new Int16Array(prev);
   let ev = 0;
   b[S.pushed] = -1;
@@ -116,37 +328,37 @@ export function step(g: Grid, prev: Int16Array, dir: number): Int16Array | null 
     // A push: nothing on top of the crate, and room for it at this level beyond.
     if (crateAt(b, to, e + 1) >= 0) return null;
     const beyond = neighbour(g, to, dir);
-    if (beyond < 0 || g.wall[beyond]) return null;
-    const k = HEAD + crate * 2;
-    const wasOnGoal = g.goal[to] && g.floor[to] === e;
-    if (g.floor[beyond] === VOID) {
-      b[k] = -1;
-      b[k + 1] = 0;
-      ev |= EVENT.lost;
-    } else {
-      const land = surface(g, b, beyond);
-      if (land > e) return null;
-      b[k] = beyond;
-      b[k + 1] = land;
-      if (land < e) ev |= EVENT.fall;
-      if (g.goal[beyond] && g.floor[beyond] === land) ev |= EVENT.goalOn;
-    }
-    if (wasOnGoal) ev |= EVENT.goalOff;
+    if (beyond < 0 || blocked(g, b, on, beyond)) return null;
+    if (g.floor[beyond] !== VOID && surface(g, b, beyond) > e) return null;
     b[S.pushes]++;
     b[S.pushed] = crate;
-    ev |= EVENT.push;
+    ev |= EVENT.push | placeCrate(g, b, on, crate, beyond, dir, true);
   } else {
     const s = surface(g, b, to);
-    if (Math.abs(s - e) > 1) return null;
+    if (Math.abs(s - e) > 1 || isHole(g, b, to)) return null;
     if (s > e) ev |= EVENT.climb;
     if (s < e) ev |= EVENT.descend;
   }
   b[S.cell] = to;
   b[S.z] = surface(g, b, to);
+  ev |= settlePlayer(g, b, on, dir);
   b[S.facing] = dir;
   b[S.moves]++;
-  ev |= EVENT.step;
-  const solved = g.goals.every((c) => covered(g, b, c));
+  ev |= convey(g, b, on) | EVENT.step;
+  for (const c of g.goals) {
+    const was = covered(g, prev, c);
+    const now = covered(g, b, c);
+    if (now && !was) ev |= EVENT.goalOn;
+    if (was && !now) ev |= EVENT.goalOff;
+  }
+  if (g.plates.length || g.receivers.length) {
+    const after = worldOf(g, b).on;
+    for (let c = 1; c <= 3; c++) {
+      if (after[c] && !on[c]) ev |= EVENT.open;
+      if (!after[c] && on[c]) ev |= EVENT.close;
+    }
+  }
+  const solved = isWon(g, b);
   if (solved && !prev[S.solved]) ev |= EVENT.win;
   b[S.solved] = solved ? 1 : 0;
   b[S.events] = ev;
@@ -155,7 +367,7 @@ export function step(g: Grid, prev: Int16Array, dir: number): Int16Array | null 
 
 export function viewState(g: Grid, b: Int16Array): GameState {
   const crates: CrateState[] = [];
-  for (let k = HEAD; k < b.length; k += 2) crates.push({ cell: b[k], z: b[k + 1] });
+  for (let k = HEAD; k < b.length; k += 2) crates.push({ cell: b[k], z: b[k + 1], kind: g.crateKind[(k - HEAD) / 2] });
   return {
     cell: b[S.cell],
     x: b[S.cell] % g.w,
@@ -168,18 +380,21 @@ export function viewState(g: Grid, b: Int16Array): GameState {
     solved: b[S.solved] === 1,
     pushed: b[S.pushed],
     crates,
+    world: worldOf(g, b),
   };
 }
 
 /**
- * The position part of a state, for the solver: the player's cell and the crates, with
- * crates sorted (they are interchangeable), counters left out.
+ * The position part of a state, for the solver: the player's cell and the crates (crates of
+ * the same kind are interchangeable, so they're sorted), the move parity when gates exist.
  */
-export function stateKey(b: Int16Array): string {
-  const pairs: number[] = [];
-  for (let k = HEAD; k < b.length; k += 2) pairs.push(b[k] * 16 + b[k + 1] + 8);
-  pairs.sort((p, q) => p - q);
-  return String.fromCharCode(b[S.cell], ...pairs);
+export function stateKey(g: Grid, b: Int16Array): string {
+  const keys: number[] = [];
+  for (let k = HEAD; k < b.length; k += 2) keys.push((g.crateKind[(k - HEAD) / 2] * 4096 + b[k] + 1) * 32 + b[k + 1] + 8);
+  keys.sort((p, q) => p - q);
+  const out = [b[S.cell], b[S.z] + 8, g.gates ? b[S.moves] % 2 : 0];
+  for (const v of keys) out.push(v & 0xffff, v >>> 16);
+  return String.fromCharCode(...out);
 }
 
 export const isSolved = (b: Int16Array) => b[S.solved] === 1;
@@ -211,6 +426,11 @@ export class Sim {
 
   get state(): GameState {
     return viewState(this.grid, this.history[this.frame]);
+  }
+
+  /** The raw state shown (for the solver and hints). */
+  get raw(): Int16Array {
+    return this.history[this.frame];
   }
 
   /** States recorded (for redo: frames above `frame` can be replayed). */

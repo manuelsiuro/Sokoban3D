@@ -6,7 +6,8 @@ import { Sim, EVENT } from '../src/sim/Sim';
 import type { LevelDef } from '../src/levels/types';
 import { check } from './assert';
 
-const lv = (map: string[], heights?: string[]): LevelDef => ({ id: 't', name: 't', world: 't', difficulty: 1, tip: '', map, heights });
+const lv = (map: string[], heights?: string[], tiles?: string[], kinds?: string[]): LevelDef => ({ id: 't', name: 't', world: 't', difficulty: 1, tip: '', map, heights, tiles, kinds });
+const tl = (map: string[], tiles: string[], kinds?: string[]) => lv(map, undefined, tiles, kinds);
 const after = (level: LevelDef, moves: string) => {
   const sim = new Sim(level);
   const n = sim.play(moves);
@@ -64,6 +65,60 @@ r = after(lv(['-@$,-'], ['00000']), 'r');
 log('a crate pushed into the void is lost', r.n === 1 && r.s.crates[0].cell === -1 && (r.s.events & EVENT.lost) !== 0);
 r = after(lv(['-@,-'], ['0000']), 'r');
 log('the player never walks into the void', r.n === 0);
+
+// Ice.
+const row = (m: string, t: string, k?: string) => tl(['#'.repeat(m.length), m, '#'.repeat(m.length)], ['', t, ''], k ? ['', k, ''] : undefined);
+r = after(row('#@$    #', '   ~~   '), 'r');
+log('a crate slides across ice and stops on the floor after it', r.s.crates[0].cell === 8 + 5 && (r.s.events & EVENT.slide) !== 0);
+r = after(row('#@$   #', '   ~~~ '), 'r');
+log('a crate slides until a wall stops it', r.s.crates[0].cell === 7 + 5);
+r = after(row('#@    #', '  ~~   '), 'r');
+log('the player slides too, off the ice onto the floor', r.s.x === 4 && r.s.moves === 1);
+r = after(row('#@  $ #', '  ~~~  '), 'r');
+log('a sliding player stops before a crate (no push)', r.s.x === 3 && r.s.crates[0].cell === 7 + 4);
+
+// Pits and lava.
+r = after(row('#@$  #', '   o  '), 'r');
+log('a crate pushed into a pit fills it', r.s.crates[0].cell === 6 + 3 && r.s.crates[0].z === -1 && (r.s.events & EVENT.fill) !== 0);
+r = after(row('#@$  #', '   o  '), 'rr');
+log('the filled pit is floor again', r.n === 2 && r.s.x === 3 && r.s.z === 0);
+r = after(row('#@   #', '   L  '), 'rr');
+log('the player never walks into open lava', r.n === 1 && r.s.x === 2);
+
+// Plates and doors.
+r = after(row('#@$ #', '   P '), 'r');
+log('a closed door blocks a crate', r.n === 0);
+r = after(row('#@ $ #', '  p P '), 'rr');
+log('a plate opens its door while held; a crate pushed in keeps it open', r.n === 2 && r.s.crates[0].cell === 6 + 4 && r.s.world.open.includes(6 + 4));
+r = after(row('#@ $ #', '  p P '), 'r');
+log('stepping on the plate opens the door', r.s.world.on[1] && (r.s.events & EVENT.open) !== 0);
+
+// Conveyors.
+r = after(row('#@   #', '  >   '), 'r');
+log('a conveyor carries the player after the move', r.s.x === 3 && (r.s.events & EVENT.convey) !== 0);
+r = after(row('#@$  #', '   >  '), 'r');
+log('a conveyor carries a crate pushed onto it', r.s.crates[0].cell === 6 + 4 && r.s.x === 2);
+
+// Teleporters.
+r = after(row('#@$   #', '   1 1 '), 'r');
+log('a crate pushed onto a pad comes out of the other', r.s.crates[0].cell === 7 + 5 && (r.s.events & EVENT.teleport) !== 0);
+r = after(row('#@$   #', '   1 1 '), 'rr');
+log('nothing comes out of a pad that is taken', r.s.x === 3);
+
+// Gates flip every move.
+r = after(row('#@  #', '  g  '), 'r');
+log('a g gate is up at the start (even moves)', r.n === 0);
+r = after(row('#@  #', '  G  '), 'rrl');
+log('a G gate is down on even moves, up on odd ones, never on someone', r.n === 3 && r.s.x === 2);
+r = after(row('#@   #', '  G   '), 'rr');
+log('...and up after the player leaves it on an odd move', r.n === 2 && r.s.world.raised.length === 0 && after(row('#@   #', '  G   '), 'rrr').s.world.raised.length === 1);
+
+// Lasers, mirrors and colors.
+const laser = (k: string) => lv(['#######', '#     #', '#  $  #', '#   @ #', '#######'], undefined, ['', '   x   ', ' E     ', '', ''], ['', '', k, '', '']);
+log('a mirror crate turns the beam onto the receiver', new Sim(laser('   /   ')).state.world.lit.length === 1 && new Sim(laser('   /   ')).state.solved);
+log('a plain crate blocks the beam', new Sim(laser('       ')).state.world.lit.length === 0);
+r = after(row('#@$.$.#', '', '  rbbr '), 'r');
+log('a colored goal wants its color', !r.s.solved && (r.s.events & EVENT.goalOn) === 0);
 
 // The record: undo, redo, replace.
 const sim = new Sim(lv(['########', '#@ $  .#', '########']));

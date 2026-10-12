@@ -45,7 +45,7 @@ export function solve(g: Grid, opts: { maxStates?: number; maxDepth?: number; st
   const parent: number[] = [-1];
   const via: number[] = [-1];
   const depth: number[] = [0];
-  const seen = new Set<string>([stateKey(first)]);
+  const seen = new Set<string>([stateKey(g, first)]);
   const path = (i: number) => {
     let out = '';
     for (; parent[i] >= 0; i = parent[i]) {
@@ -61,7 +61,7 @@ export function solve(g: Grid, opts: { maxStates?: number; maxDepth?: number; st
     for (let d = 0; d < 4; d++) {
       const next = step(g, b, d);
       if (!next) continue;
-      const key = stateKey(next);
+      const key = stateKey(g, next);
       if (seen.has(key)) continue;
       if (live && eventsOf(next) & EVENT.push && crateCells(next).some((c) => c >= 0 && !live[c])) continue;
       seen.add(key);

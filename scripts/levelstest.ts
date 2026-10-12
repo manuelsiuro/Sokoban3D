@@ -13,6 +13,7 @@ for (const level of LEVELS) {
   check(solution !== undefined, `${level.id}: no stored solution (run scripts/dev/solveall.ts)`);
   if (solution === undefined) continue;
   const sim = new Sim(level);
+  check(sim.grid.goals.length + sim.grid.receivers.length > 0, `${level.id}: nothing to solve`);
   check(!sim.state.solved, `${level.id}: solved at the start`);
   const played = sim.play(solution);
   const s = sim.state;

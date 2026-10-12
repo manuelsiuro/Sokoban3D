@@ -144,6 +144,11 @@ function present(prev: GameState, forward: boolean) {
     else if (e & EVENT.climb) sound.climb();
     else sound.step();
     if (e & EVENT.goalOn) sound.goal();
+    if (e & EVENT.slide) sound.slide();
+    if (e & EVENT.teleport) sound.teleport();
+    if (e & EVENT.fill) sound.fill();
+    if (e & EVENT.convey) sound.convey();
+    if (e & (EVENT.open | EVENT.close)) sound.door((e & EVENT.open) !== 0);
   } else sound.undo();
   updateHud();
   if (s.moves >= 3) tip.classList.add('gone');
@@ -356,5 +361,8 @@ async function titleFlow() {
   }
 }
 
-titleFlow();
+// Dev only: ?level=<id> opens that level straight away (for checking content).
+const devLevel = import.meta.env.DEV ? LEVELS.findIndex((l) => l.id === new URLSearchParams(location.search).get('level')) : -1;
+if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
+else titleFlow();
 registerServiceWorker(() => {});

@@ -40,7 +40,7 @@ export const BIOMES: Record<string, Biome> = {
   tundra: {
     skyTop: 0x8fb4e0, skyBottom: 0xeef4fb, fog: 0xe6eef8,
     ground: 0xf2f7fc, ground2: 0xe5eef7, soil: 0x8aa0b8, rock: 0x6f8296,
-    wall: 'ice', wallColor: 0x9fd4f0, wallTop: 0xd6f0fb,
+    wall: 'ice', wallColor: 0x6f86a3, wallTop: 0xf7fbff,
     crate: 0xc98f54, crateTrim: 0x7d4f27, goal: 0x5fe3ff,
     sun: 0xf2f6ff, sunIntensity: 2.2, ambient: 1.4,
     decor: ['pine', 'pine', 'snowRock'],
