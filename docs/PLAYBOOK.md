@@ -9,9 +9,10 @@ What building two games taught us, written so the next game starts from it, not 
 
 It covers the working method, the architecture (real-time and turn-based), content at scale,
 testing, UI, juice, i18n, progression and release. Paths are examples from one game or the
-other. The starter template (`~/ClaudeProjects/web-game-starter`) holds the reusable base, but
-it **predates Cratelands**: copy the newer pieces from Cratelands where this file says so (the
-fixed service worker, i18n, haptics, photo mode, icon script).
+other. The starter template (`~/ClaudeProjects/web-game-starter`) holds the reusable base,
+including what Cratelands added (the self-healing service worker and boot guard, i18n,
+haptics, the icon script). Bigger systems stay in Cratelands to copy when a game needs them:
+photo mode, the solver and generator, the tutorial coach, the help screen, quality tiers.
 
 **How to use it**
 - Starting a new game: read **1. Working method** and **16. Checklists**, then copy the starter.
@@ -465,7 +466,7 @@ Offer it from the HUD and from the win summary.
   asset the stored `index.html` references is cached, and a new worker takes over and
   reloads a broken client. An inline boot guard in `index.html` (the app sets
   `window.__<game>Booted`) clears the service worker and caches and reloads once if the game
-  hasn't started after 12 s. **The starter still has the old worker: copy Cratelands'.**
+  hasn't started after 12 s. The starter has both (rename `game-`, `__gameBooted`).
 - **Icons from a script** (`scripts/dev/icon.ts` → SVGs, `npm run icons` → PNGs with
   `rsvg-convert`):
   - `icon.svg` full bleed (192, 512 and the 180 px `apple-touch-icon`, no transparency);
@@ -533,8 +534,8 @@ the cached game.
 **New game kickoff**
 - [ ] Copy `web-game-starter`, `npm ci`; rename the storage prefix, title, colors, manifest;
       pick a dev port of its own.
-- [ ] Port from Cratelands: the fixed `vite-sw.ts` and boot guard, `src/i18n/` (with
-      `keys.ts`), `haptics.ts`, the icon script.
+- [ ] Rename the starter's cache prefix and boot flag; redraw the icon (`scripts/dev/icon.ts`,
+      `npm run icons`); copy bigger systems from Cratelands as needed (photo mode, solver).
 - [ ] Decide the core loop and what is deterministic: fixed step (real time) or a state per
       move (turn-based); define the inputs and the events.
 - [ ] Set up CI and Pages on day one; show the version on the title.
