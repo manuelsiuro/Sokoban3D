@@ -49,7 +49,7 @@ ${picked
     id: '${world}-${k + 1}',
     name: ${JSON.stringify(slot.name)},
     world: W,
-    difficulty: ${slot.difficulty},
+    difficulty: ${slot.difficulty},${slot.biome ? `\n    biome: '${slot.biome}',` : ''}
     tip: ${JSON.stringify(slot.tip)},
 ${levelSource(c.level)}  },`,
   )

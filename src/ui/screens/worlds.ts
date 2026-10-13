@@ -64,7 +64,7 @@ const timedCard = (l: LevelCard, i: number) => `<button class="level-card timed 
     <span class="level-medal">${l.medal ? icon('trophy', 22) : icon('clock', 22)}</span>
     <span class="level-best">${l.time !== undefined ? t('trial.best', { time: formatTime(l.time) }) : t('trial.goldIn', { time: formatTime(l.gold) })}</span>
   </button>`;
-const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="level-card ${state(l, all.find((x) => x.unlocked && !x.stars) === l)}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
+export const levelCardHtml = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="level-card ${state(l, all.find((x) => x.unlocked && !x.stars) === l)}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
     <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
     ${l.clean ? `<span class="level-badge" title="${t('worlds.clean')}">${icon('feather', 18)}</span>` : ''}
     <span class="level-name">${l.name}</span>
@@ -122,7 +122,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       ? `<div class="seg" role="tablist"><button class="${trial ? '' : 'on'}" data-mode="moves" role="tab" aria-selected="${!trial}">${icon('star', 14)} ${t('trial.moves')}</button><button class="${trial ? 'on' : ''}" data-mode="time" role="tab" aria-selected="${trial}">${icon('clock', 14)} ${t('trial.time')}</button></div>`
       : '';
     sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${trial ? t('trial.about') : w.mechanic}</small></h3>${toggle}<button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button></div>
-      <div class="level-grid">${w.levels.map((l, i) => (trial ? timedCard(l, i) : card(l, i, w.levels))).join('')}</div>
+      <div class="level-grid">${w.levels.map((l, i) => (trial ? timedCard(l, i) : levelCardHtml(l, i, w.levels))).join('')}</div>
       ${w.grand && !trial ? grandCard(w.grand) : ''}`;
   };
   const go = (to: number) => {

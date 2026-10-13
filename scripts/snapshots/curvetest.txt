@@ -6,3 +6,4 @@ forge      10 levels  opens at  66 stars  difficulty 1 1 2 2 3 3 3 4 4 5
 crystal    10 levels  opens at  83 stars  difficulty 1 1 2 2 3 3 3 4 4 5
 clockwork  10 levels  opens at 100 stars  difficulty 1 1 2 2 3 3 3 4 4 5
 reverse    10 levels  opens at 116 stars  difficulty 1 1 2 2 3 3 3 4 4 5
+planets    10 levels  sizes 3 3 3 3 3 4 4 4 4 4  difficulty 1 1 2 2 3 3 3 4 4 5

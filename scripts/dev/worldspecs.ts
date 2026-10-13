@@ -11,6 +11,8 @@ export interface Slot {
   par: [number, number];
   gen: Record<string, number>;
   rounds?: number;
+  /** The look (a world's biome) when it isn't the world's own (planets borrow the campaign's). */
+  biome?: string;
 }
 
 export const SPECS: Record<string, { about: string; slots: Slot[] }> = {
@@ -117,6 +119,21 @@ export const SPECS: Record<string, { about: string; slots: Slot[] }> = {
       { name: 'Backwater', difficulty: 4, par: [32, 56], gen: { pull: 1, crates: 3, w: 6, h: 6, walls: 0.22 }, tip: 'Every pull leaves you one step further on.' },
       { name: 'Undertow', difficulty: 4, par: [38, 66], gen: { pull: 1, crates: 3, w: 7, h: 6, states: 800000 }, tip: 'Pull a crate past a pad to make room, then bring it back.' },
       { name: 'Through the Glass', difficulty: 5, par: [44, 90], gen: { pull: 1, crates: 3, w: 7, h: 7, states: 1200000 }, tip: 'The grove\'s last riddle: everything backwards at once.' },
+    ],
+  },
+  planet: {
+    about: 'Planets (a title mode): the board is the outside of a small cube planet, its net written as the map. Walk off a face onto the next; crates go over the edges too.',
+    slots: [
+      { name: 'Small World', biome: 'meadow', difficulty: 1, par: [6, 14], gen: { planet: 3, crates: 1, walls: 0.1, seams: 1 }, tip: 'Walk off the edge: the planet turns under you. Push the crate over the edge to its pad.' },
+      { name: 'Over the Hill', biome: 'meadow', difficulty: 1, par: [10, 20], gen: { planet: 3, crates: 1, walls: 0.14, seams: 2 }, tip: 'A crate pushed over an edge carries on down the next face.' },
+      { name: 'Twin Moons', biome: 'desert', difficulty: 2, par: [14, 28], gen: { planet: 3, crates: 2, walls: 0.14, seams: 1 }, tip: 'Lost? Tap the globe to see the whole planet.' },
+      { name: 'Round Trip', biome: 'sky', difficulty: 2, par: [18, 34], gen: { planet: 3, crates: 2, walls: 0.2, seams: 2 }, tip: 'Corners of the planet are where three faces meet: crates get stuck there.' },
+      { name: 'Ice Belt', biome: 'tundra', difficulty: 3, par: [14, 34], gen: { planet: 3, crates: 2, walls: 0.14, ice: 0.25 }, tip: 'Ice runs round the planet: a sliding crate can go all the way round.' },
+      { name: 'Far Side', biome: 'crystal', difficulty: 3, par: [16, 40], gen: { planet: 4, crates: 2, walls: 0.16, teleports: 1 }, tip: 'The teleporter joins two faces: the quick way to the far side.' },
+      { name: 'Crater', biome: 'desert', difficulty: 3, par: [18, 44], gen: { planet: 4, crates: 2, walls: 0.14, pits: 1, states: 800000 }, tip: 'Fill the crater with a crate before you can cross it.' },
+      { name: 'Painted Planet', biome: 'clockwork', difficulty: 4, par: [24, 50], gen: { planet: 4, crates: 3, walls: 0.14, colors: 3, states: 800000 }, tip: 'Each crate wants the pad of its color, wherever on the planet it is.' },
+      { name: 'Frost Moon', biome: 'tundra', difficulty: 4, par: [24, 56], gen: { planet: 4, crates: 2, walls: 0.18, ice: 0.22, states: 600000, tries: 200 }, tip: 'Stop a slide with a wall, a crate, or yourself.' },
+      { name: 'Orbit', biome: 'forge', difficulty: 5, par: [34, 80], gen: { planet: 4, crates: 3, walls: 0.22, seams: 3, states: 1000000, tries: 150 }, tip: 'The last planet: every face has a part to play.' },
     ],
   },
 };

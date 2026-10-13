@@ -370,3 +370,84 @@
 .hud-help {
   flex: none;
 }
+
+/* Planets: the unfolded planet in a corner (tap: bigger). */
+.hud-minimap {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 62px);
+  right: max(12px, env(safe-area-inset-right));
+  width: 132px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(250, 252, 255, 0.82);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px -10px rgba(20, 50, 90, 0.45);
+  pointer-events: auto;
+  transition: width 0.25s var(--ease);
+}
+.hud-minimap.big {
+  width: min(300px, 70vw);
+}
+.hud-minimap.gone {
+  display: none;
+}
+.hud-minimap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mm-face {
+  fill: #dfe9d6;
+  stroke: rgba(30, 60, 40, 0.18);
+  stroke-width: 0.8;
+}
+.mm-face.here {
+  fill: #eef6e6;
+  stroke: #2f8fe0;
+  stroke-width: 1.6;
+}
+.mm-wall {
+  fill: #5d6b5a;
+}
+.mm-ice {
+  fill: #9fd4f2;
+}
+.mm-pit {
+  fill: #8a6438;
+}
+.mm-tele {
+  fill: none;
+  stroke: #b983ff;
+  stroke-width: 1.6;
+}
+.mm-goal {
+  fill: none;
+  stroke-width: 1.8;
+}
+.mm-crate {
+  fill: #c98a45;
+  stroke: #6b4320;
+  stroke-width: 0.8;
+}
+.mm-crate.done {
+  stroke: #ffd447;
+  stroke-width: 1.6;
+}
+.mm-me {
+  fill: #e0433a;
+  stroke: white;
+  stroke-width: 1.2;
+}
+.mm-up {
+  fill: none;
+  stroke: #2f8fe0;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+@media (max-height: 480px) {
+  .hud-minimap {
+    top: calc(max(10px, env(safe-area-inset-top)) + 54px);
+    width: 112px;
+  }
+}

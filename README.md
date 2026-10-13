@@ -19,6 +19,7 @@ plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](
 - **Workshop**: paint a level with every mechanic (made for phones: tools in a dock under the thumb, undo and redo), check it with the solver, play it, share a link.
 - **Mirror Grove**: 10 levels with pull rules (crates can only be pulled), opening with the Desert.
 - **Grand Islands**: a four-room finale per world; the camera follows on phones (V: whole island).
+- **Planets**: Sokoban on little cube worlds drawn round: walk or push off an edge onto the next face; the camera rolls with you.
 - **Expedition**: endless generated islands through every world, compasses to skip, seeded runs (`#exp=`).
 - **Time Trial**: replay a cleared world against the clock for bronze, silver and gold, with a real-time ghost.
 - **How to play**: basics, every world's rule with a picture, and the modes (title, the HUD's ?,
@@ -53,6 +54,7 @@ npx tsx scripts/dev/buildgrand.ts [world ...]      # rebuild Grand Islands (src/
 | `src/sim/generator.ts` | Room generator (keeps rooms whose optimal solution uses the requested mechanics) |
 | `src/app/worker.ts` | Hints, the daily puzzle and Expedition floors, off the main thread |
 | `src/app/context.ts`, `boot.ts` | The shared objects (renderer, view, sound, settings); migrations first |
+| `src/sim/cube.ts`, `src/render/planet.ts` | Planets: the cube net's seams (neighbours and turned headings), and the round shape, frames and ground |
 | `src/app/kiosk.ts` | The title's showcase: one island per world takes turns behind the menu |
 | `src/modes/` | One file per mode: `run.ts` (playing: HUD, input, timer), campaign, daily, expedition, shared, workshop, coach (tutorial) |
 | `src/game/expedition*.ts`, `path.ts` | Expedition runs and floors; tap-to-move paths |

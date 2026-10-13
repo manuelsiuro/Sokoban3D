@@ -78,3 +78,13 @@ OK   reverse-7      par  46 pushes  14 crates 3  ★★ ≤69 ★★★ ≤50
 OK   reverse-8      par  49 pushes  15 crates 3  ★★ ≤73 ★★★ ≤53
 OK   reverse-9      par  43 pushes  12 crates 3  ★★ ≤64 ★★★ ≤47
 OK   reverse-10     par  64 pushes  24 crates 3  ★★ ≤96 ★★★ ≤70
+OK   planet-1       par  11 pushes   9 crates 1  ★★ ≤16 ★★★ ≤12
+OK   planet-2       par  18 pushes  12 crates 1  ★★ ≤27 ★★★ ≤19
+OK   planet-3       par  28 pushes  18 crates 2  ★★ ≤42 ★★★ ≤30
+OK   planet-4       par  30 pushes  16 crates 2  ★★ ≤45 ★★★ ≤33
+OK   planet-5       par  26 pushes  14 crates 2  ★★ ≤39 ★★★ ≤28
+OK   planet-6       par  37 pushes  23 crates 2  ★★ ≤55 ★★★ ≤40
+OK   planet-7       par  28 pushes  16 crates 3  ★★ ≤42 ★★★ ≤30
+OK   planet-8       par  27 pushes  16 crates 3  ★★ ≤40 ★★★ ≤29
+OK   planet-9       par  37 pushes  22 crates 2  ★★ ≤55 ★★★ ≤40
+OK   planet-10      par  64 pushes  26 crates 3  ★★ ≤96 ★★★ ≤70

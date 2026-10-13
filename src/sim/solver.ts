@@ -1,5 +1,5 @@
 import { DIRS, VOID, type Grid } from './grid';
-import { MOVED_CRATE, crateCells, eventsOf, initialState, inputCount, isSolved, neighbour, stateKey, step } from './Sim';
+import { MOVED_CRATE, arrival, crateCells, eventsOf, initialState, inputCount, isSolved, neighbour, stateKey, step } from './Sim';
 
 /**
  * Finds the fewest-moves solution by breadth-first search over the real rules (`step`), so
@@ -25,9 +25,10 @@ export function liveCells(g: Grid): Uint8Array {
   while (todo.length) {
     const c = todo.pop()!;
     for (let d = 0; d < 4; d++) {
-      // A crate at `from` pushed in direction d (player behind it at `back`) lands on c.
-      const from = neighbour(g, c, (d + 2) % 4);
-      const back = from < 0 ? -1 : neighbour(g, from, (d + 2) % 4);
+      // A crate at `from` (next to c) pushed towards c, the player behind it at `back`.
+      // Links are mutual, so away from c at `from` is the direction we arrived in.
+      const from = neighbour(g, c, d);
+      const back = from < 0 ? -1 : neighbour(g, from, arrival(g, c, d));
       if (!open(from) || !open(back) || live[from]) continue;
       live[from] = 1;
       todo.push(from);

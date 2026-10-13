@@ -1,5 +1,5 @@
 import type { LevelDef } from '../levels/types';
-import { DIRS, DX, DY, KIND, TILE, VOID, parseLevel, type Grid } from './grid';
+import { DIRS, KIND, TILE, VOID, parseLevel, type Grid } from './grid';
 
 /**
  * The game's rules, deterministic and turn-based: the state after move n depends only on
@@ -138,11 +138,10 @@ function covered(g: Grid, b: Int16Array, cell: number) {
   return g.goalColor[cell] === 0 || g.crateKind[k] === g.goalColor[cell];
 }
 
-export function neighbour(g: Grid, cell: number, dir: number) {
-  const x = (cell % g.w) + DX[dir];
-  const y = Math.floor(cell / g.w) + DY[dir];
-  return x < 0 || y < 0 || x >= g.w || y >= g.h ? -1 : y * g.w + x;
-}
+/** The cell next to `cell` in direction `dir` (-1: none). */
+export const neighbour = (g: Grid, cell: number, dir: number) => g.link[cell * 4 + dir];
+/** The direction something heading `dir` from `cell` has once it arrives next door (it turns only over a planet's edge). */
+export const arrival = (g: Grid, cell: number, dir: number) => g.turn[cell * 4 + dir];
 
 const MIRROR_SLASH = [1, 0, 3, 2];
 const MIRROR_BACK = [3, 2, 1, 0];
@@ -176,6 +175,7 @@ export function worldOf(g: Grid, b: Int16Array): World {
       }
       if (g.floor[next] !== VOID && g.floor[next] > level) break;
       const k = crateAt(b, next, level);
+      dir = arrival(g, cell, dir);
       if (k >= 0) {
         const kind = g.crateKind[k];
         if (kind !== KIND.mirrorSlash && kind !== KIND.mirrorBack) break;
@@ -236,6 +236,7 @@ const isWon = (g: Grid, b: Int16Array) => g.goals.every((c) => covered(g, b, c))
 function placeCrate(g: Grid, b: Int16Array, on: readonly boolean[], k: number, cell: number, dir: number, slide: boolean, dest: number): number {
   const i = HEAD + k * 2;
   let ev = 0;
+  const first = cell;
   for (let n = 0; n < g.w * g.h; n++) {
     if (g.floor[cell] === VOID) {
       b[i] = -1;
@@ -250,10 +251,12 @@ function placeCrate(g: Grid, b: Int16Array, on: readonly boolean[], k: number, c
     if ((g.tile[cell] === TILE.pit || g.tile[cell] === TILE.lava) && land === g.floor[cell]) return ev | EVENT.fill;
     if (!slide || g.tile[cell] !== TILE.ice || land !== g.floor[cell]) break;
     // On ice: on to the next cell, if there's room at this level.
+    // (Round a planet, a slide that comes back to where it started stops there.)
     const next = neighbour(g, cell, dir);
-    if (next < 0 || blocked(g, b, on, next) || b[S.cell] === next || next === dest) break;
+    if (next < 0 || next === first || blocked(g, b, on, next) || b[S.cell] === next || next === dest) break;
     if (g.floor[next] !== VOID && surface(g, b, next) > land) break;
     ev |= EVENT.slide;
+    dir = arrival(g, cell, dir);
     cell = next;
   }
   const pad = b[i];
@@ -269,21 +272,27 @@ function placeCrate(g: Grid, b: Int16Array, on: readonly boolean[], k: number, c
   return ev;
 }
 
-/** The player slides across ice (stopping before anything in the way), then may teleport. */
+/**
+ * The player slides across ice (stopping before anything in the way, or back where the
+ * slide started), then may teleport. Sets the facing to the direction the slide ended in.
+ */
 function settlePlayer(g: Grid, b: Int16Array, on: readonly boolean[], dir: number): number {
   let ev = 0;
+  const first = b[S.cell];
   for (let n = 0; n < g.w * g.h; n++) {
     const cell = b[S.cell];
     const z = b[S.z];
     if (g.tile[cell] !== TILE.ice || z !== g.floor[cell]) break;
     const next = neighbour(g, cell, dir);
-    if (next < 0 || blocked(g, b, on, next) || g.floor[next] === VOID || crateAt(b, next, z) >= 0 || isHole(g, b, next)) break;
+    if (next < 0 || next === first || blocked(g, b, on, next) || g.floor[next] === VOID || crateAt(b, next, z) >= 0 || isHole(g, b, next)) break;
     const s = surface(g, b, next);
     if (s > z || s < z - 1) break;
     b[S.cell] = next;
     b[S.z] = s;
+    dir = arrival(g, cell, dir);
     ev |= EVENT.slide;
   }
+  b[S.facing] = dir;
   return ev | teleportPlayer(g, b, on);
 }
 
@@ -325,7 +334,7 @@ function convey(g: Grid, b: Int16Array, on: readonly boolean[]): number {
       // Never from under the player or another crate, never into the player.
       if (k < 0 || moved.has(k) || crateAt(b, c, z + 1) >= 0 || b[S.cell] === c || b[S.cell] === to) continue;
       if (g.floor[to] !== VOID && surface(g, b, to) > z) continue;
-      ev |= placeCrate(g, b, on, k, to, dir, false, -1) | EVENT.convey;
+      ev |= placeCrate(g, b, on, k, to, arrival(g, c, dir), false, -1) | EVENT.convey;
       moved.add(k);
       changed = true;
     }
@@ -342,6 +351,8 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
   const dir = input & 3;
   const to = neighbour(g, from, dir);
   if (to < 0 || g.floor[to] === VOID || blocked(g, prev, on, to)) return null;
+  // The direction once in `to` (the same, except over a planet's edge).
+  const ahead = arrival(g, from, dir);
   const b = new Int16Array(prev);
   let ev = 0;
   b[S.pushed] = -1;
@@ -361,12 +372,12 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
     if (g.pull) return null;
     // A push: nothing on top of the crate, and room for it at this level beyond.
     if (crateAt(b, to, e + 1) >= 0) return null;
-    const beyond = neighbour(g, to, dir);
+    const beyond = neighbour(g, to, ahead);
     if (beyond < 0 || blocked(g, b, on, beyond)) return null;
     if (g.floor[beyond] !== VOID && surface(g, b, beyond) > e) return null;
     b[S.pushes] = Math.min(MAX_MOVES, b[S.pushes] + 1);
     b[S.pushed] = crate;
-    ev |= EVENT.push | placeCrate(g, b, on, crate, beyond, dir, true, to);
+    ev |= EVENT.push | placeCrate(g, b, on, crate, beyond, arrival(g, to, ahead), true, to);
   } else {
     const s = surface(g, b, to);
     if (Math.abs(s - e) > 1 || isHole(g, b, to)) return null;
@@ -375,9 +386,9 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
   }
   b[S.cell] = to;
   b[S.z] = surface(g, b, to);
-  ev |= settlePlayer(g, b, on, dir);
+  ev |= settlePlayer(g, b, on, ahead);
   // Pulling, the pusher walks backwards, facing the crate.
-  b[S.facing] = pulling ? (dir + 2) % 4 : dir;
+  if (pulling) b[S.facing] = (b[S.facing] + 2) % 4;
   b[S.moves] = prev[S.moves] >= MAX_MOVES ? MAX_MOVES - 1 : prev[S.moves] + 1;
   ev |= convey(g, b, on) | EVENT.step;
   for (const c of g.goals) {

@@ -1,10 +1,10 @@
-import { EVENT, inputOf, type GameState } from '../sim/Sim';
+import { EVENT, inputOf, neighbour, type GameState } from '../sim/Sim';
 import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
 import { buzz } from '../app/haptics';
 import { startGamepad } from '../app/gamepad';
-import { DX, DY, TILE } from '../sim/grid';
+import { TILE } from '../sim/grid';
 import { walkTo } from '../game/path';
 import { Coach } from './coach';
 import { levelText, t, type Key } from '../i18n';
@@ -16,6 +16,7 @@ import { WORLDS } from '../levels/worlds';
 import { showHelp } from '../ui/screens/help';
 import { TOUCH, h, setText } from '../ui/dom';
 import { icon } from '../ui/icons';
+import { CRATE_COLORS } from '../render/mechanics';
 
 /**
  * Playing a level: the HUD, the input (keys, d-pad, swipes, taps, gamepads), the sounds of each move, hints,
@@ -42,6 +43,7 @@ const hud = h(
      <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
      <button class="icon-btn" data-a="right" data-l="hud.turnRight">${icon('rotateRight')}</button>
    </div>
+   <button class="hud-minimap gone" data-a="minimap" data-l="hud.minimap"></button>
    <p class="hud-tip gone" role="status" aria-live="polite"></p>
    ${
      TOUCH
@@ -66,7 +68,65 @@ function updateHud() {
   setText($('.hud-moves small'), run?.par ? t('hud.par', { par: run.par }) : t('hud.moves'));
   $<HTMLButtonElement>('[data-a="undo"]').disabled = screen.sim.frame === 0;
   if (run?.ghost) view.setGhost(run.ghost[Math.min(s.moves, run.ghost.length - 1)]);
+  drawMinimap();
 }
+
+/** The Look button shows whether the free camera is on (planets). */
+function syncLook() {
+  const b = $('.hud-view');
+  const on = view.looking;
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', String(on));
+}
+
+/**
+ * Planets: the unfolded cube in a corner, with the pads, crates and the pusher (and an arrow
+ * for which way is up on screen), so the far side is never a mystery.
+ */
+function drawMinimap() {
+  const el = $('.hud-minimap');
+  const g = screen.sim.grid;
+  if (!g.planet || !run) {
+    el.classList.add('gone');
+    return;
+  }
+  el.classList.remove('gone');
+  const s = screen.shown;
+  const C = 10;
+  const n = g.planet;
+  const parts: string[] = [];
+  const at = (c: number) => [(c % g.w) * C, Math.floor(c / g.w) * C];
+  const here = Math.floor((s.cell % g.w) / n) + Math.floor(Math.floor(s.cell / g.w) / n) * 4;
+  // The faces, the one the pusher is on outlined.
+  for (const [fx, fy] of [[1, 0], [0, 1], [1, 1], [2, 1], [3, 1], [1, 2]]) parts.push(`<rect class="mm-face${fx + fy * 4 === here ? ' here' : ''}" x="${fx * n * C}" y="${fy * n * C}" width="${n * C}" height="${n * C}" rx="3"/>`);
+  for (let c = 0; c < g.w * g.h; c++) {
+    if (g.floor[c] === -100) continue;
+    const [x, y] = at(c);
+    if (g.wall[c]) parts.push(`<rect class="mm-wall" x="${x + 1}" y="${y + 1}" width="${C - 2}" height="${C - 2}" rx="1.5"/>`);
+    else if (g.tile[c] === TILE.ice) parts.push(`<rect class="mm-ice" x="${x + 1}" y="${y + 1}" width="${C - 2}" height="${C - 2}" rx="1.5"/>`);
+    else if (g.tile[c] === TILE.pit && !s.crates.some((k) => k.cell === c)) parts.push(`<rect class="mm-pit" x="${x + 2}" y="${y + 2}" width="${C - 4}" height="${C - 4}" rx="1"/>`);
+    else if (g.tile[c] === TILE.teleport) parts.push(`<circle class="mm-tele" cx="${x + C / 2}" cy="${y + C / 2}" r="3"/>`);
+    if (g.goal[c]) parts.push(`<circle class="mm-goal" cx="${x + C / 2}" cy="${y + C / 2}" r="3.3" style="stroke:${MM_COLORS[g.goalColor[c]]}"/>`);
+  }
+  for (const k of s.crates) {
+    if (k.cell < 0) continue;
+    const [x, y] = at(k.cell);
+    const done = g.goal[k.cell] && (!g.goalColor[k.cell] || g.goalColor[k.cell] === k.kind);
+    parts.push(`<rect class="mm-crate${done ? ' done' : ''}" x="${x + 2}" y="${y + 2}" width="${C - 4}" height="${C - 4}" rx="1.2" style="fill:${k.kind >= 1 && k.kind <= 4 ? MM_COLORS[k.kind] : ''}"/>`);
+  }
+  // The pusher, and the way "up" on screen goes from it.
+  const [px, py] = at(s.cell);
+  const d = view.screenDir(0);
+  const ax = [0, 1, 0, -1][d];
+  const ay = [-1, 0, 1, 0][d];
+  const cx = px + C / 2;
+  const cy = py + C / 2;
+  // A chevron just ahead of the dot: tip 9 out, wings 5 out and 3 to each side.
+  parts.push(`<path class="mm-up" d="M${cx + ax * 5 - ay * 3} ${cy + ay * 5 + ax * 3}L${cx + ax * 9} ${cy + ay * 9}L${cx + ax * 5 + ay * 3} ${cy + ay * 5 - ax * 3}"/>`);
+  parts.push(`<circle class="mm-me" cx="${px + C / 2}" cy="${py + C / 2}" r="3.4"/>`);
+  el.innerHTML = `<svg viewBox="-2 -2 ${4 * n * C + 4} ${3 * n * C + 4}" aria-hidden="true">${parts.join('')}</svg>`;
+}
+const MM_COLORS = ['#ffd447', ...CRATE_COLORS.slice(1).map((c) => `#${c.toString(16).padStart(6, '0')}`)];
 
 // ------------------------------------------------------------------ playing
 interface Run {
@@ -139,6 +199,11 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
     $('.hud-grab').classList.toggle('gone', !screen.sim.grid.pull || !!opts.autoplay);
     $('.hud-view').classList.toggle('gone', !view.follows);
     $('.hud-view').classList.remove('on');
+    // On a planet the overview is the whole globe.
+    const globe = screen.sim.grid.planet > 0;
+    $('.hud-view').innerHTML = icon(globe ? 'globe' : 'map');
+    $('.hud-view').dataset.l = globe ? 'hud.globe' : 'hud.overview';
+    $('.hud-view').setAttribute('aria-label', t(globe ? 'hud.globe' : 'hud.overview'));
     setGrab(false);
     setText($('.hud-count'), String(opts.skip ?? ''));
     hud.classList.toggle('watching', !!opts.autoplay);
@@ -277,6 +342,11 @@ function setGrab(on: boolean) {
  */
 function move(dir: number, pull = false) {
   stopWalk();
+  // A move brings the camera back behind the pusher (the screen's directions are its).
+  if (view.looking) {
+    view.looking = false;
+    syncLook();
+  }
   const pulling = screen.sim.grid.pull && (pull || grab);
   moveGrid(view.screenDir(dir) + (pulling ? 4 : 0));
 }
@@ -304,14 +374,17 @@ function stopWalk() {
 function tapCell(cell: number) {
   if (!run || run.over || run.watching || cell < 0) return;
   stopWalk();
+  if (view.looking) {
+    view.looking = false;
+    syncLook();
+  }
   const g = screen.sim.grid;
   const at = screen.shown.cell;
-  const dx = (cell % g.w) - (at % g.w);
-  const dy = Math.floor(cell / g.w) - Math.floor(at / g.w);
-  if (Math.abs(dx) + Math.abs(dy) === 1) {
-    const d = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+  // Next door (over a planet's edge too): a single step that way.
+  const d = [0, 1, 2, 3].find((k) => neighbour(g, at, k) === cell);
+  if (d !== undefined) {
     // Pull levels: a step away from a crate right behind pulls it.
-    const behind = (at % g.w) - DX[d] + (Math.floor(at / g.w) - DY[d]) * g.w;
+    const behind = neighbour(g, at, (d + 2) % 4);
     const pull = g.pull && screen.shown.crates.some((c) => c.cell === behind && c.z === screen.shown.z);
     moveGrid(d + (pull ? 4 : 0));
     return;
@@ -341,6 +414,7 @@ function act(a: string) {
   }
   if (a === 'left' || a === 'right') {
     view.rotate(a === 'left' ? -1 : 1);
+    drawMinimap();
     click();
     return;
   }
@@ -354,6 +428,17 @@ function act(a: string) {
     click();
     const p = loadProgress();
     showHelp({ open: new Set(WORLDS.filter((_, k) => isWorldOpen(k, p)).map((w) => w.id)), world: run.level.world }, click);
+    return;
+  }
+  if (a === 'minimap') {
+    click();
+    $('.hud-minimap').classList.toggle('big');
+    return;
+  }
+  if (a === 'overview' && screen.sim.grid.planet) {
+    click();
+    view.looking = !view.looking;
+    syncLook();
     return;
   }
   if (a === 'overview' && view.follows) {
@@ -511,10 +596,62 @@ for (const pad of hud.querySelectorAll<HTMLElement>('[data-d]')) {
   pad.addEventListener('lostpointercapture', up);
 }
 let swipe: { x: number; y: number; id: number; moved: boolean; t: number } | null = null;
+// Planets: looking around. Two fingers (or the right mouse button, or one finger with Look
+// on) spin the planet; pinching or the wheel zooms. Every pointer down on the canvas is kept.
+const pointers = new Map<number, { x: number; y: number }>();
+let pinch = 0;
+let spinning = false;
+const onPlanet = () => !!run && !run.over && screen.sim.grid.planet > 0;
+const spread = () => {
+  const [a, b] = [...pointers.values()];
+  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+};
+const middle = () => {
+  const ps = [...pointers.values()];
+  return { x: ps.reduce((n, p) => n + p.x, 0) / ps.length, y: ps.reduce((n, p) => n + p.y, 0) / ps.length };
+};
+let spinFrom = { x: 0, y: 0 };
+renderer.domElement.addEventListener('contextmenu', (e) => {
+  if (onPlanet()) e.preventDefault();
+});
+renderer.domElement.addEventListener(
+  'wheel',
+  (e) => {
+    if (!onPlanet()) return;
+    e.preventDefault();
+    view.zoom(Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * 0.004));
+    syncLook();
+  },
+  { passive: false },
+);
 renderer.domElement.addEventListener('pointerdown', (e) => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (onPlanet() && (pointers.size >= 2 || e.button === 2 || view.looking)) {
+    // A spin, not a swipe or a tap.
+    spinning = true;
+    swipe = pointers.size === 1 ? { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false, t: performance.now() } : null;
+    spinFrom = middle();
+    pinch = spread();
+    return;
+  }
   swipe = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false, t: performance.now() };
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (spinning) {
+    const m = middle();
+    const dx = m.x - spinFrom.x;
+    const dy = m.y - spinFrom.y;
+    // One finger with Look on: a short press is still a tap (walk there).
+    if (swipe && Math.hypot(e.clientX - swipe.x, e.clientY - swipe.y) > 8) swipe.moved = true;
+    if (!swipe || swipe.moved) view.spin(dx, dy);
+    spinFrom = m;
+    const d = spread();
+    if (pinch && d) view.zoom(pinch / d);
+    pinch = d;
+    syncLook();
+    return;
+  }
   if (!swipe || e.pointerId !== swipe.id) return;
   const dx = e.clientX - swipe.x;
   const dy = e.clientY - swipe.y;
@@ -525,11 +662,23 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   swipe.x = e.clientX;
   swipe.y = e.clientY;
 });
+const lift = (e: PointerEvent) => {
+  pointers.delete(e.pointerId);
+  if (spinning) {
+    spinFrom = middle();
+    pinch = spread();
+    if (pointers.size === 0) spinning = false;
+  }
+};
 renderer.domElement.addEventListener('pointerup', (e) => {
   // A short press that didn't swipe is a tap on a cell.
-  if (swipe && e.pointerId === swipe.id && !swipe.moved && performance.now() - swipe.t < 450) tapCell(view.cellAt(e.clientX, e.clientY));
+  if (swipe && e.pointerId === swipe.id && !swipe.moved && pointers.size === 1 && performance.now() - swipe.t < 450) tapCell(view.cellAt(e.clientX, e.clientY));
   swipe = null;
+  lift(e);
 });
-renderer.domElement.addEventListener('pointercancel', () => (swipe = null));
+renderer.domElement.addEventListener('pointercancel', (e) => {
+  swipe = null;
+  lift(e);
+});
 
 startGamepad({ playing: () => !!run && !document.querySelector('.modal'), move: (d, pull) => move(d, pull), act });

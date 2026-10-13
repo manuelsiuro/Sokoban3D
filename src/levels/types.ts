@@ -30,6 +30,8 @@ export interface LevelDef {
   world: string;
   /** 1 (gentle) to 5 (hard); never drops inside a world (curvetest). */
   difficulty: number;
+  /** The look and music, when not the world's own (planets wear the campaign worlds'). */
+  biome?: string;
   tip: string;
   map: string[];
   /** Floor height per cell, one digit each ('0'–'9'); missing rows or cells are 0. */
@@ -38,6 +40,12 @@ export interface LevelDef {
   kinds?: string[];
   /** 'pull': crates can't be pushed, only pulled (stepping away from one drags it along). */
   rules?: 'pull';
+  /**
+   * Planet levels: the board is the outside of a cube of this size, and `map` (and the
+   * layers) are its unfolded net, 4N wide and 3N tall (see src/sim/cube.ts). Walking off a
+   * face leads onto the next. Plain floor, ice, pits and teleporters only.
+   */
+  planet?: number;
   /** 'bound': the stored solution is the best known, not proven fewest (too big to search). */
   parProof?: 'bound';
 }

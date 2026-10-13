@@ -335,3 +335,91 @@
   color: white;
   background: linear-gradient(180deg, #5aa6f5, #2f6fd0);
 }
+
+/* ------------------------------------------------------------ Planets list */
+/* A strip of planet cards along the bottom; the chosen planet turns above it. */
+.planets-screen .worlds-head h2 {
+  opacity: 1;
+  color: white;
+  text-shadow: 0 2px 12px rgba(10, 30, 60, 0.35);
+}
+
+.planets-screen .sheet {
+  max-height: none;
+  overflow: visible;
+  padding-top: 14px;
+}
+
+.planets-about {
+  margin: 0 0 10px;
+  font: 500 14px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.planets-screen .level-grid {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 4px;
+  margin: 0 -4px;
+  padding: 4px 4px 10px;
+  align-items: flex-start;
+  scrollbar-width: thin;
+}
+
+.planets-screen .level-card {
+  flex: 0 0 168px;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 480px) {
+  .planets-screen .level-grid {
+    display: flex;
+    gap: 10px;
+  }
+  .planets-screen .level-card {
+    flex-basis: 142px;
+  }
+}
+
+@media (max-height: 480px) {
+  .planets-screen .sheet {
+    max-height: none;
+    border-radius: 22px 22px 0 0;
+    padding-top: 10px;
+  }
+  .planets-about {
+    display: none;
+  }
+  .planets-screen .level-card {
+    flex-basis: 150px;
+    gap: 3px;
+    min-height: 0;
+    padding: 8px 12px;
+  }
+  .planets-screen .level-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    font-size: 16px;
+  }
+  .planets-screen .level-diff {
+    display: none;
+  }
+}
+
+/* The title's "New" tag on a fresh mode. */
+.menu-new {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font: 800 10px/1.5 var(--font-ui);
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  color: white;
+  background: var(--tone, #3f7fe0);
+}

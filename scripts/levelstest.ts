@@ -3,12 +3,13 @@
  * solved; every level parses. Prints a line per level, compared with the snapshot.
  */
 import { LEVELS } from '../src/levels/levels';
+import { PLANET } from '../src/levels/worlds/planet';
 import { SOLUTIONS } from '../src/levels/solutions';
 import { Sim } from '../src/sim/Sim';
 import { starLimits } from '../src/game/score';
 import { check } from './assert';
 
-for (const level of LEVELS) {
+for (const level of [...LEVELS, ...PLANET]) {
   const solution = SOLUTIONS[level.id];
   check(solution !== undefined, `${level.id}: no stored solution (run scripts/dev/solveall.ts)`);
   if (solution === undefined) continue;
