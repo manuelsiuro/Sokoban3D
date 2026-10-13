@@ -769,7 +769,7 @@ export class View {
       this.hintDir = dir;
       this.hintCell = this.state?.cell ?? -1;
       // The arrow's tip looks along -z: turn it to the direction.
-      this.hintArrow.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir];
+      this.hintArrow.rotation.set(0, [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir], 0);
     }
   }
 
@@ -929,7 +929,8 @@ export class View {
     } else {
       let df = this.facing - this.facingFrom;
       df = ((((df + 2) % 4) + 4) % 4) - 2;
-      p.group.rotation.y = (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2);
+      // (rotation.set: clears any tilt a planet left on the pusher.)
+      p.group.rotation.set(0, (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2), 0);
     }
     // Lean into a push, lean back hauling a pull; a little bob while idle; a happy spin once solved.
     p.body.rotation.x = (this.pushing ? 0.25 : this.pulling ? -0.3 : 0) * (t < 1 ? Math.sin(Math.PI * t) : 0);
@@ -1017,7 +1018,7 @@ export class View {
         this.ghost.position.lerp(this.ghostTo, Math.min(1, dt * 14));
         let d = this.ghostTurn - this.ghost.rotation.y;
         d = Math.atan2(Math.sin(d), Math.cos(d));
-        this.ghost.rotation.y += d * Math.min(1, dt * 12);
+        this.ghost.rotation.set(0, this.ghost.rotation.y + d * Math.min(1, dt * 12), 0);
       }
     }
     if (this.hintArrow?.visible && this.state) {
@@ -1051,6 +1052,8 @@ export class View {
     if (this.orbiting && !this.reducedMotion) this.yaw += dt * 0.04;
     this.shownYaw += (this.yaw - this.shownYaw) * Math.min(1, dt * (this.orbiting ? 2 : 6));
     if (this.planet) return this.placePlanetCamera(dt);
+    // Islands: up is up (a planet turns the camera's up to follow the pusher).
+    this.camera.up.set(0, 1, 0);
     let a = this.shownYaw * (Math.PI / 2);
     let pitch = 1.08;
     // Far enough that the island fits both ways: its depth up and down, its width across.
