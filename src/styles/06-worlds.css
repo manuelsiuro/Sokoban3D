@@ -263,3 +263,75 @@
   opacity: 1;
   filter: drop-shadow(0 2px 6px rgba(232, 169, 19, 0.5));
 }
+
+/* The Grand Island card under a world's levels. */
+.grand-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  color: white;
+  text-align: left;
+  background: linear-gradient(135deg, #f2a51f, #d9541f 60%, #a03a8a);
+  box-shadow: 0 14px 30px -12px rgba(160, 58, 40, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.18s var(--spring);
+}
+
+.grand-card:active {
+  transform: scale(0.98);
+}
+
+.grand-card.locked {
+  color: var(--ink-soft);
+  background: rgba(20, 40, 80, 0.06);
+  box-shadow: none;
+}
+
+.grand-ic {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.grand-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.grand-text small {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.grand-text b {
+  font: 700 20px var(--font-display);
+}
+
+.grand-text span {
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.9;
+}
+
+.hud-view.gone {
+  display: none;
+}
+
+.hud-view.on {
+  color: white;
+  background: linear-gradient(180deg, #5aa6f5, #2f6fd0);
+}

@@ -1,0 +1,8 @@
+meadow-grand     15x13  crates 10  best known 156
+tundra-grand     15x13  crates 9  best known 127
+desert-grand     15x13  crates 14  best known 136
+sky-grand        15x13  crates 8  best known 117
+forge-grand      15x13  crates 10  best known 136
+crystal-grand    15x13  crates 11  best known 139
+clockwork-grand  15x13  crates 8  best known 133
+reverse-grand    15x13  crates 7  best known 119

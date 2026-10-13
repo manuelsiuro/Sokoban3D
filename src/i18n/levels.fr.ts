@@ -80,4 +80,12 @@ export const FR_LEVELS: Record<string, { name: string; tip: string }> = {
   "reverse-8": { name: "Eaux dormantes", tip: "Chaque traction te laisse un pas plus loin." },
   "reverse-9": { name: "Ressac", tip: "Tire une caisse au-delà d’une dalle pour faire de la place, puis ramène-la." },
   "reverse-10": { name: "De l’autre côté du miroir", tip: "La dernière énigme du bosquet : tout à l’envers à la fois." },
+  "meadow-grand": { name: "La grande ferme", tip: "Quatre champs en un : finis chacun avant de passer la brèche." },
+  "tundra-grand": { name: "La forteresse gelée", tip: "Quatre salles de glace. Attention aux passages : une glissade peut y emporter une caisse." },
+  "desert-grand": { name: "Le temple englouti", tip: "Chaque salle a ses dalles et ses portes." },
+  "sky-grand": { name: "La citadelle des nuages", tip: "Quatre terrasses : grimpe, descends et empile pour traverser." },
+  "forge-grand": { name: "La grande fonderie", tip: "Tapis et lave, salle après salle." },
+  "crystal-grand": { name: "La chambre des prismes", tip: "Les couleurs, puis la lumière : une salle à la fois." },
+  "clockwork-grand": { name: "La grande horloge", tip: "Les portes comptent aussi chaque pas entre les salles." },
+  "reverse-grand": { name: "Le labyrinthe miroir", tip: "Quatre jardins à traverser en tirant." },
 };

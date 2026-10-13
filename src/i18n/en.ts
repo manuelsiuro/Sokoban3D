@@ -323,6 +323,20 @@ export const en = {
   "medal.bronze": "Bronze",
   "medal.silver": "Silver",
   "medal.gold": "Gold",
+  "grand.kicker": "Grand Island",
+  "grand.about": "Four rooms in one: the world's finale",
+  "grand.locked": "Clear the world to open it",
+  "grand.best": "Best {best} · best known {par}",
+  "grand.label": "{world} · Grand Island",
+  "grand.beatBest": "Fewer moves than our best known: well played!",
+  "grand.parLabel": "best known",
+  "hud.overview": "Whole island (V)",
+  "trophy.grand.name": "{world} conquered",
+  "trophy.grand.desc": "Solve the Grand Island of {world}.",
+  "trophy.tour.name": "Grand Tour",
+  "trophy.tour.desc": "Solve every Grand Island.",
+  "skin.marble": "Marble",
+  "grand.matched": "Matched the best known!",
 } as const;
 
 export type Strings = { [K in keyof typeof en]: string };

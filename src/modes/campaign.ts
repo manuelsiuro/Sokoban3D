@@ -6,6 +6,7 @@ import { OPENS_AFTER, isUnlocked, isWorldOpen, saveTime, worldCleared, loadProgr
 import { formatTime, medalFor, medalTimes, starLimits, starsFor } from '../game/score';
 import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
+import { GRANDS, GRAND_SOLUTIONS } from '../levels/grand';
 import { KEYS as STORE, readJSON, writeJSON } from '../game/storage';
 import { h } from '../ui/dom';
 import { levelText, t } from '../i18n';
@@ -70,6 +71,30 @@ export async function levelFlow(index: number): Promise<number> {
   }
 }
 
+/** The level sheet's Grand Island card for a world. */
+function grandCardOf(world: string, p: ReturnType<typeof loadProgress>) {
+  const g = GRANDS.find((x) => x.world === world);
+  if (!g) return undefined;
+  return { name: levelText(g).name, stars: p[g.id]?.stars ?? 0, best: p[g.id]?.moves ?? 0, par: GRAND_SOLUTIONS[g.id].length, open: worldCleared(world, p) };
+}
+
+/** A world's Grand Island: the big finale, with the camera following the pusher. Par is the best known. */
+export async function grandFlow(world: string) {
+  const level = GRANDS.find((g) => g.world === world);
+  if (!level) return;
+  const p = GRAND_SOLUTIONS[level.id].length;
+  const label = t('grand.label', { world: WORLDS.find((w) => w.id === world)?.name ?? '' });
+  for (;;) {
+    const r = await play(level, label, p, { ghost: loadProgress()[level.id]?.run });
+    if (!r) return;
+    const stars = starsFor(r.state.moves, p);
+    const best = saveResult(level.id, stars, r.state.moves, r.clean, r.moves);
+    const extra = [r.state.moves < p ? t('grand.beatBest') : '', newTrophies()].filter(Boolean).join(' · ');
+    const choice = await summary({ stars, moves: r.state.moves, pushes: r.state.pushes, par: p, limits: starLimits(p), best, clean: r.clean, hasNext: false, extra, bound: true });
+    if (choice !== 'retry') return;
+  }
+}
+
 const MEDAL_KEYS = ['trial.noMedal', 'trial.bronze', 'trial.silver', 'trial.gold'] as const;
 
 /** Time Trial: a solved level against the clock, through Next inside its world; the best time's ghost runs alongside. */
@@ -127,6 +152,7 @@ export async function worldsFlow(start: number) {
         gate: worldGate(k),
         soon: levels.length === 0,
         trial: worldCleared(w.id, p),
+        grand: grandCardOf(w.id, p),
         levels: levels.map(({ l, i }) => ({
           index: i,
           name: levelText(l).name,
@@ -144,6 +170,11 @@ export async function worldsFlow(start: number) {
     });
     const i = await showWorlds(cards, at, { select: (k) => (map.select(k), sound.setMusic(settings.music, settings.musicVolume, WORLDS[k].id)), pick: (x, y) => map.pick(x, y) }, click);
     if (i === null) return;
+    if (i.grand) {
+      await grandFlow(LEVELS[i.index].world);
+      at = { world: worldIndex(i.index), sheet: true, timed: false };
+      continue;
+    }
     const last = i.timed ? await timeTrialFlow(i.index) : await levelFlow(i.index);
     at = { world: worldIndex(last), sheet: true, timed: i.timed };
   }

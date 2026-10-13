@@ -44,6 +44,15 @@ export class View {
   private grid: Grid | null = null;
   private biome: Biome = biomeOf('meadow');
   private center = new THREE.Vector3();
+  /** A big island (Grand Islands): on narrow or short screens the camera frames a window around the pusher, unless the overview is on. */
+  private big = false;
+  get follows() {
+    return this.big && (this.camera.aspect < 1.3 || innerHeight < 560);
+  }
+  overview = false;
+  /** The point the camera aims at, eased toward the island's middle or the pusher. */
+  private aim = new THREE.Vector3();
+  private aimSpan = { radius: 5, half: 5 };
   private radius = 5;
   /** Half the island's longest side, rim included (what must fit across a narrow screen). */
   private halfSpan = 5;
@@ -329,6 +338,10 @@ export class View {
     this.center.set(0, (maxZ * LEVEL_H) / 2, 0);
     this.radius = Math.hypot(grid.w, grid.h) / 2 + 0.6;
     this.halfSpan = Math.max(grid.w, grid.h) / 2 + 1;
+    this.big = Math.max(grid.w, grid.h) > 12;
+    this.overview = false;
+    this.aim.copy(this.center);
+    this.aimSpan = { radius: this.radius, half: this.halfSpan };
     // Shadows cover the island.
     const sc = this.sun.shadow.camera;
     const r = this.radius + 3;
@@ -754,8 +767,23 @@ export class View {
     let a = this.shownYaw * (Math.PI / 2);
     let pitch = 1.08;
     // Far enough that the island fits both ways: its depth up and down, its width across.
+    // On a big island, a window of about nine cells around the pusher, kept inside the island.
+    const framed = this.follows && !this.overview && !this.orbiting;
+    const want = framed ? { radius: 6.6, half: 5.2 } : { radius: this.radius, half: this.halfSpan };
+    const glide = Math.min(1, dt * 4);
+    this.aimSpan.radius += (want.radius - this.aimSpan.radius) * glide;
+    this.aimSpan.half += (want.half - this.aimSpan.half) * glide;
+    const target = this.center.clone();
+    if (framed && this.grid) {
+      const p = this.player.group.position;
+      const mx = Math.max(0, this.grid.w / 2 - 4);
+      const mz = Math.max(0, this.grid.h / 2 - 4);
+      target.set(Math.max(-mx, Math.min(mx, p.x)), this.center.y, Math.max(-mz, Math.min(mz, p.z)));
+    }
+    this.aim.lerp(target, glide);
+    const c = this.aim;
     const tan = Math.tan((this.camera.fov * Math.PI) / 360);
-    let dist = Math.max((this.radius / tan) * 0.92, (this.halfSpan / (tan * this.camera.aspect)) * 1.04) + 1;
+    let dist = Math.max((this.aimSpan.radius / tan) * 0.92, (this.aimSpan.half / (tan * this.camera.aspect)) * 1.04) + 1;
     // The fly-in: from high and far, easing down onto the island.
     if (this.introAt >= 0) {
       const e = Math.min(1, (this.now - this.introAt) / 1.1);
@@ -771,10 +799,10 @@ export class View {
       a += 0.32 * ease;
       dist *= 1 - 0.1 * ease;
     }
-    this.camera.position.set(this.center.x + Math.sin(a) * Math.cos(pitch) * dist, this.center.y + Math.sin(pitch) * dist, this.center.z + Math.cos(a) * Math.cos(pitch) * dist);
+    this.camera.position.set(c.x + Math.sin(a) * Math.cos(pitch) * dist, c.y + Math.sin(pitch) * dist, c.z + Math.cos(a) * Math.cos(pitch) * dist);
     // On tall screens, aim a little toward the camera: the island rises above the touch controls.
     const lift = this.camera.aspect < 1 ? 0.9 : 0;
-    this.camera.lookAt(this.center.x + Math.sin(a) * lift, this.center.y - 0.3, this.center.z + Math.cos(a) * lift);
+    this.camera.lookAt(c.x + Math.sin(a) * lift, c.y - 0.3, c.z + Math.cos(a) * lift);
     if (this.shakeAmp > 0.002) {
       const s = this.shakeAmp;
       this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));

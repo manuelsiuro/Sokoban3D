@@ -5,6 +5,7 @@ import type { DailyProgress } from './dailyProgress';
 import type { Progress } from './progress';
 import { KEYS, readJSON, writeJSON } from './storage';
 import { medalFor } from './score';
+import { GRANDS } from '../levels/grand';
 import { t } from '../i18n';
 
 /**
@@ -34,6 +35,7 @@ export const SKINS: Skin[] = [
   { id: 'gold', get name() { return t('skin.gold'); }, crate: 0xffcf4d, trim: 0xb07a12 },
   { id: 'royal', get name() { return t('skin.royal'); }, crate: 0x3f4fd0, trim: 0xffcf4d },
   { id: 'chrono', get name() { return t('skin.chrono'); }, crate: 0xe8eef5, trim: 0xff5a5f },
+  { id: 'marble', get name() { return t('skin.marble'); }, crate: 0xf2efe8, trim: 0x9a8f80 },
   { id: 'abyss', get name() { return t('skin.abyss'); }, crate: 0x2a3a5e, trim: 0x5fe3ff },
 ];
 
@@ -94,6 +96,11 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'flash', get name() { return t('trophy.flash.name'); }, get desc() { return t('trophy.flash.desc'); }, count: (c) => Math.max(...WORLDS.map((w) => (golds(c, ids(w.id)) === ids(w.id).length && ids(w.id).length ? 1 : 0))), goal: 1 },
   { id: 'explorer', get name() { return t('trophy.explorer.name'); }, get desc() { return t('trophy.explorer.desc'); }, reward: { outfit: 'navigator' }, count: () => deepest(), goal: 10 },
   { id: 'deep', get name() { return t('trophy.deep.name'); }, get desc() { return t('trophy.deep.desc'); }, reward: { skin: 'abyss' }, count: () => deepest(), goal: 25 },
+  ...GRANDS.map((g): Achievement => {
+    const world = () => WORLDS.find((w) => w.id === g.world)?.name ?? g.world;
+    return { id: `grand-${g.world}`, get name() { return t('trophy.grand.name', { world: world() }); }, get desc() { return t('trophy.grand.desc', { world: world() }); }, count: (c) => ((c.progress[g.id]?.stars ?? 0) > 0 ? 1 : 0), goal: 1 };
+  }),
+  { id: 'tour', get name() { return t('trophy.tour.name'); }, get desc() { return t('trophy.tour.desc'); }, reward: { skin: 'marble' }, count: (c) => GRANDS.filter((g) => (c.progress[g.id]?.stars ?? 0) > 0).length, goal: GRANDS.length },
   { id: 'champion', get name() { return t('trophy.champion.name'); }, get desc() { return t('trophy.champion.desc'); }, reward: { skin: 'royal' }, count: (c) => solved(c, ids()), goal: ids().length },
   { id: 'perfect', get name() { return t('trophy.perfect.name'); }, get desc() { return t('trophy.perfect.desc'); }, reward: { skin: 'gold' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.stars ?? 0) >= 3).length, goal: ids().length },
 ];

@@ -36,6 +36,8 @@ export interface WorldCard {
   soon: boolean;
   /** Cleared: its levels can be played against the clock. */
   trial: boolean;
+  /** The world's Grand Island (open once the world is cleared). */
+  grand?: { name: string; stars: number; best: number; par: number; open: boolean };
   levels: LevelCard[];
 }
 
@@ -48,6 +50,12 @@ export interface MapHooks {
 
 const pips = (n: number) => `<span class="level-diff" title="${t('worlds.difficulty', { n })}">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
 const state = (l: LevelCard, next: boolean) => (!l.unlocked ? 'locked' : l.stars >= 3 ? 'solved perfect' : l.stars ? 'solved' : next ? 'next' : '');
+/** The Grand Island: one wide card under the levels, locked until the world is cleared. */
+const grandCard = (g: NonNullable<WorldCard['grand']>) => `<button class="grand-card ${g.open ? '' : 'locked'}" data-grand ${g.open ? '' : 'disabled'}>
+    <span class="grand-ic">${icon(g.open ? 'crown' : 'lock', 24)}</span>
+    <span class="grand-text"><small>${t('grand.kicker')}</small><b>${g.name}</b><span>${g.open ? (g.best ? t('grand.best', { best: g.best, par: g.par }) : t('grand.about')) : t('grand.locked')}</span></span>
+    <span class="level-stars">${[0, 1, 2].map((s) => `<i class="${s < g.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
+  </button>`;
 const MEDALS = ['', 'bronze', 'silver', 'gold'];
 /** A level card in Time Trial: the medal won and the best time (or the time for gold). */
 const timedCard = (l: LevelCard, i: number) => `<button class="level-card timed ${l.medal ? `medal-${MEDALS[l.medal]}` : ''}" data-i="${l.index}" style="animation-delay:${i * 0.03}s">
@@ -69,7 +77,9 @@ const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="leve
  * The world map's overlay: the selected world's card (‹ › or swipe to change, tap an island
  * to pick it), and a sheet of its levels. Resolves with a level index, or null for back.
  */
-export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: boolean; timed?: boolean }, map: MapHooks, click: () => void): Promise<{ index: number; timed: boolean } | null> {
+export type WorldsChoice = { index: number; timed: boolean; grand?: boolean };
+
+export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: boolean; timed?: boolean }, map: MapHooks, click: () => void): Promise<WorldsChoice | null> {
   let k = start.world;
   let timed = !!start.timed;
   const total = worlds.reduce((n, w) => n + w.stars, 0);
@@ -112,7 +122,8 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       ? `<div class="seg" role="tablist"><button class="${trial ? '' : 'on'}" data-mode="moves" role="tab" aria-selected="${!trial}">${icon('star', 14)} ${t('trial.moves')}</button><button class="${trial ? 'on' : ''}" data-mode="time" role="tab" aria-selected="${trial}">${icon('clock', 14)} ${t('trial.time')}</button></div>`
       : '';
     sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${trial ? t('trial.about') : w.mechanic}</small></h3>${toggle}<button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button></div>
-      <div class="level-grid">${w.levels.map((l, i) => (trial ? timedCard(l, i) : card(l, i, w.levels))).join('')}</div>`;
+      <div class="level-grid">${w.levels.map((l, i) => (trial ? timedCard(l, i) : card(l, i, w.levels))).join('')}</div>
+      ${w.grand && !trial ? grandCard(w.grand) : ''}`;
   };
   const go = (to: number) => {
     if (to < 0 || to >= worlds.length || to === k) return;
@@ -129,7 +140,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
   if (start.sheet) openSheet();
 
   return new Promise((resolve) => {
-    const finish = (v: { index: number; timed: boolean } | null) => {
+    const finish = (v: WorldsChoice | null) => {
       removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('pointerup', onUp);
@@ -177,6 +188,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       else if (btn.dataset.step) go(k + Number(btn.dataset.step));
       else if (btn.dataset.open !== undefined) openSheet();
       else if (btn.dataset.close !== undefined) sheet.classList.add('hidden');
+      else if (btn.dataset.grand !== undefined) finish({ index: worlds[k].levels[0]?.index ?? 0, timed: false, grand: true });
       else if (btn.dataset.mode) {
         timed = btn.dataset.mode === 'time';
         render();

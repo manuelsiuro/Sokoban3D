@@ -20,6 +20,8 @@ export interface SummaryInfo {
   share?: () => Promise<string>;
   /** Offer to watch the best run. */
   watch?: boolean;
+  /** Par is the best known, not a proven fewest (Grand Islands). */
+  bound?: boolean;
   /** Time Trial: the time shown first, the medal's name, the next medal's time (stars are the medal). */
   time?: { text: string; medal: string; next: string; gold: boolean };
 }
@@ -27,7 +29,7 @@ export interface SummaryInfo {
 /** A solved level: stars, moves against par, and what to do next. */
 /** `star(k)` plays as the k-th earned star lands (its animation). */
 export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number) => void): Promise<SummaryChoice> {
-  const hint = r.time ? r.time.next : r.stars < 3 ? t('summary.forThree', { n: r.limits[1] }) : r.moves <= r.par ? t('summary.matched') : t('summary.three');
+  const hint = r.time ? r.time.next : r.stars < 3 ? t('summary.forThree', { n: r.limits[1] }) : r.moves <= r.par ? t(r.bound ? 'grand.matched' : 'summary.matched') : t('summary.three');
   const notes = [r.par ? hint : '', r.best ? t('summary.newBest') : '', r.clean ? t('summary.noUndo') : ''].filter(Boolean);
   const stat = (label: string, value: number | string, cls = '') => `<span class="stat ${cls}"><b>${value}</b><small>${label}</small></span>`;
   const el = h(
@@ -41,7 +43,7 @@ export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number
         ${r.time ? stat(t('trial.timeLabel'), r.time.text, r.time.gold ? 'par-hit' : '') : ''}
         ${stat(t('summary.moves'), r.moves, r.par && r.moves <= r.par ? 'par-hit' : '')}
         ${r.time ? '' : stat(t('summary.pushes'), r.pushes)}
-        ${r.par ? stat(t('summary.par'), r.par) : ''}
+        ${r.par ? stat(t(r.bound ? 'grand.parLabel' : 'summary.par'), r.par) : ''}
       </div>
       ${notes.length ? `<p class="summary-notes">${notes.map((n) => `<span>${n}</span>`).join('')}</p>` : ''}
       ${r.extra ? `<p class="summary-extra">${r.extra}</p>` : ''}

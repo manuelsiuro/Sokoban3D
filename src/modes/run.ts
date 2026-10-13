@@ -31,6 +31,7 @@ const hud = h(
      <button class="icon-btn" data-a="undo" data-l="hud.undo">${icon('undo')}</button>
      <button class="icon-btn" data-a="restart" data-l="hud.restart">${icon('replay')}</button>
      <button class="icon-btn" data-a="hint" data-l="hud.hint">${icon('bulb')}</button>
+     <button class="icon-btn hud-view gone" data-a="overview" data-l="hud.overview" aria-pressed="false">${icon('map')}</button>
      <button class="icon-btn hud-grab gone" data-a="grab" data-l="hud.grab" aria-pressed="false">${icon('hand')}</button>
      <button class="icon-btn hud-skip gone" data-a="skip" data-l="hud.skip">${icon('compass')}<b class="hud-count"></b></button>
      <span class="sep"></span>
@@ -130,6 +131,8 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
       tick(run);
     }
     $('.hud-grab').classList.toggle('gone', !screen.sim.grid.pull || !!opts.autoplay);
+    $('.hud-view').classList.toggle('gone', !view.follows);
+    $('.hud-view').classList.remove('on');
     setGrab(false);
     setText($('.hud-count'), String(opts.skip ?? ''));
     hud.classList.toggle('watching', !!opts.autoplay);
@@ -319,6 +322,13 @@ function act(a: string) {
     click();
     return;
   }
+  if (a === 'overview' && view.follows) {
+    click();
+    view.overview = !view.overview;
+    $('.hud-view').classList.toggle('on', view.overview);
+    $('.hud-view').setAttribute('aria-pressed', String(view.overview));
+    return;
+  }
   if (run.over || run.watching) return;
   if (a === 'hint') {
     askHint();
@@ -397,7 +407,7 @@ async function askHint() {
 }
 
 const KEYS: Record<string, number> = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
-const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', Escape: 'back' };
+const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', KeyV: 'overview', Escape: 'back' };
 addEventListener('keydown', (e) => {
   if (!run || e.metaKey || e.ctrlKey || e.altKey) {
     // Ctrl/Cmd+Z also undoes.

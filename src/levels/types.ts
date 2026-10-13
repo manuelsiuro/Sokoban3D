@@ -38,4 +38,6 @@ export interface LevelDef {
   kinds?: string[];
   /** 'pull': crates can't be pushed, only pulled (stepping away from one drags it along). */
   rules?: 'pull';
+  /** 'bound': the stored solution is the best known, not proven fewest (too big to search). */
+  parProof?: 'bound';
 }
