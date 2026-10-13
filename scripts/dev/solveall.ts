@@ -5,13 +5,15 @@
  */
 import { writeFileSync } from 'node:fs';
 import { LEVELS } from '../../src/levels/levels';
+import { PLANET } from '../../src/levels/worlds/planet';
 import { SOLUTIONS } from '../../src/levels/solutions';
 import { parseLevel } from '../../src/sim/grid';
 import { solve } from '../../src/sim/solver';
 
 const only = process.argv.slice(2);
 const out: Record<string, string> = {};
-for (const level of LEVELS) {
+// The campaign, then the Planets mode's levels.
+for (const level of [...LEVELS, ...PLANET]) {
   if (only.length && !only.includes(level.id) && SOLUTIONS[level.id] !== undefined) {
     out[level.id] = SOLUTIONS[level.id];
     continue;

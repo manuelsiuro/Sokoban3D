@@ -3,18 +3,20 @@
  * random walls, crates, goals and mechanics, solved by the real solver. Only rooms whose
  * optimal solution uses every requested mechanic are kept. `pull: 1` makes pull-rule rooms.
  */
+import { cubeNet } from './cube';
 import { parseLevel, TILE } from './grid';
 import { liveCells, solve } from './solver';
 import { EVENT, Sim } from './Sim';
 import { rng } from './rng';
 import type { LevelDef } from '../levels/types';
 
-export const DEFAULTS: Record<string, number> = { crates: 3, w: 6, h: 6, walls: 0.18, ice: 0, pits: 0, lava: 0, doors: 0, conveyors: 0, teleports: 0, gates: 0, colors: 0, terraces: 0, holes: 0, lasers: 0, pull: 0, tries: 500, seed: 1, top: 5, states: 400000 };
+export const DEFAULTS: Record<string, number> = { crates: 3, w: 6, h: 6, walls: 0.18, ice: 0, pits: 0, lava: 0, doors: 0, conveyors: 0, teleports: 0, gates: 0, colors: 0, terraces: 0, holes: 0, lasers: 0, pull: 0, planet: 0, seams: 0, tries: 500, seed: 1, top: 5, states: 400000 };
 
 export interface Cand { level: LevelDef; par: number; pushes: number; changes: number; states: number; score: number; solution: string }
 
 export function propose(options: Partial<Record<string, number>>): Cand[] {
   const opt = { ...DEFAULTS, ...options } as Record<string, number>;
+  if (opt.planet) return proposePlanet(opt);
   const R = rng(opt.seed);
   const W = opt.w + 2;
   const H = opt.h + 2;
@@ -176,5 +178,129 @@ export function propose(options: Partial<Record<string, number>>): Cand[] {
     out.push({ level: L, par: r.solution.length, pushes, changes, states: r.explored, solution: r.solution, score: pushes + changes * 3 + Math.log2(r.explored) * 2 });
   }
 
+  return out.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Planet rooms (`planet: N`): walls, crates and goals on the surface of an N-cube (its net,
+ * cube.ts). Cells the player can't reach are walled in. `seams: n` keeps only rooms whose
+ * solution pushes crates over an edge at least n times. Ice, pits, lava, teleporters and
+ * colors as in propose().
+ */
+function proposePlanet(opt: Record<string, number>): Cand[] {
+  const R = rng(opt.seed);
+  const net = cubeNet(opt.planet);
+  const { w, h } = net;
+  const out: Cand[] = [];
+  const surface = [...net.face.keys()].filter((i) => net.face[i] >= 0);
+  for (let t = 0; t < opt.tries; t++) {
+    const map: string[] = [...Array(w * h)].map((_, i) => (net.face[i] >= 0 && R.next() < opt.walls ? '#' : ' '));
+    const tiles: string[] = Array(w * h).fill(' ');
+    const kinds: string[] = Array(w * h).fill(' ');
+    const open = surface.filter((i) => map[i] === ' ');
+    if (open.length < 2 * opt.crates + 8) continue;
+    // The player first; every cell it can't reach becomes rock.
+    const p = open[R.int(open.length)];
+    const reach = new Set([p]);
+    for (const todo = [p]; todo.length; ) {
+      const c = todo.pop()!;
+      for (let d = 0; d < 4; d++) {
+        const n = net.link[c * 4 + d];
+        if (map[n] === ' ' && !reach.has(n)) {
+          reach.add(n);
+          todo.push(n);
+        }
+      }
+    }
+    for (const i of open) if (!reach.has(i)) map[i] = '#';
+    const free = open.filter((i) => reach.has(i) && i !== p);
+    if (free.length < 2 * opt.crates + 8) continue;
+    map[p] = '@';
+    const take = () => free.splice(R.int(free.length), 1)[0];
+    if (opt.ice) {
+      // Ice in patches, grown across the seams.
+      const want = Math.round(free.length * opt.ice);
+      const seeds = [take(), take()];
+      for (const c of seeds) tiles[c] = '~';
+      for (let k = 0; k < want * 4 && seeds.length < want && free.length > 2 * opt.crates + 4; k++) {
+        const n = net.link[R.pick(seeds) * 4 + R.int(4)];
+        const i = free.indexOf(n);
+        if (i < 0) continue;
+        free.splice(i, 1);
+        tiles[n] = '~';
+        seeds.push(n);
+      }
+    }
+    for (let k = 0; k < opt.pits; k++) tiles[take()] = 'o';
+    for (let k = 0; k < opt.lava; k++) tiles[take()] = 'L';
+    for (let k = 0; k < opt.teleports; k++) {
+      // A pair on two different faces.
+      const a = take();
+      const others = free.filter((c) => net.face[c] !== net.face[a]);
+      if (!others.length) continue;
+      const b = others[R.int(others.length)];
+      free.splice(free.indexOf(b), 1);
+      tiles[a] = tiles[b] = String(k + 1);
+    }
+    const goalCells = [...Array(opt.crates)].map(take);
+    for (const c of goalCells) map[c] = '.';
+    const rows = (a: string[]) => [...Array(h)].map((_, y) => a.slice(y * w, y * w + w).join('').trimEnd());
+    const level = (): LevelDef => ({ id: 'gen', name: 'gen', world: 'gen', difficulty: 1, tip: '', planet: opt.planet, map: rows(map), tiles: rows(tiles), kinds: rows(kinds) });
+    let live: Uint8Array | null = null;
+    try {
+      const probe = level();
+      probe.map = probe.map.map((r) => r.replaceAll('.', '*'));
+      const g = parseLevel(probe);
+      if (g.classic) live = liveCells(g);
+    } catch {
+      continue;
+    }
+    const extra = opt.pits + opt.lava;
+    const ok = free.filter((c) => !live || live[c]);
+    if (ok.length < opt.crates + extra) continue;
+    const crates: number[] = [];
+    for (let i = 0; i < opt.crates + extra; i++) {
+      const c = ok.splice(R.int(ok.length), 1)[0];
+      map[c] = '$';
+      crates.push(c);
+    }
+    for (let i = 0; i < opt.colors && i < opt.crates; i++) kinds[goalCells[i]] = kinds[crates[i]] = 'rgby'[i % 4];
+    const L = level();
+    let g;
+    try {
+      g = parseLevel(L);
+    } catch {
+      continue;
+    }
+    const r = solve(g, { maxStates: opt.states });
+    if (!r.solution || r.solution.length < 6) continue;
+    const sim = new Sim(L);
+    let changes = 0;
+    let last = -1;
+    let used = 0;
+    let seams = 0;
+    const faces = new Set<number>();
+    for (const c of r.solution) {
+      const before = sim.state.crates.map((k) => k.cell);
+      sim.play(c);
+      const s = sim.state;
+      used |= s.events;
+      faces.add(net.face[s.cell]);
+      s.crates.forEach((k, i) => {
+        if (k.cell >= 0 && before[i] >= 0 && net.face[k.cell] !== net.face[before[i]]) seams++;
+      });
+      if (s.pushed >= 0 && s.pushed !== last) {
+        changes++;
+        last = s.pushed;
+      }
+    }
+    if (seams < opt.seams) continue;
+    if (opt.ice && !(used & EVENT.slide)) continue;
+    if ((opt.pits || opt.lava) && !(used & EVENT.fill)) continue;
+    if (opt.teleports && !(used & EVENT.teleport)) continue;
+    const pushes = [...r.solution].filter((c) => c >= 'A' && c <= 'Z').length;
+    // Rooms that send the player round the planet and crates over its edges score higher.
+    out.push({ level: L, par: r.solution.length, pushes, changes, states: r.explored, solution: r.solution, score: pushes + changes * 3 + seams * 3 + faces.size * 2 + Math.log2(r.explored) * 2 });
+  }
   return out.sort((a, b) => b.score - a.score);
 }

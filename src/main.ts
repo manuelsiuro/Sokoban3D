@@ -26,6 +26,7 @@ import { dailyFlow } from './modes/daily';
 import { sharedFlow } from './modes/shared';
 import { workshopFlow } from './modes/workshop';
 import { expeditionFlow } from './modes/expedition';
+import { planetsDone, planetsFlow } from './modes/planets';
 import { loadExpedition } from './game/expedition';
 import { startKiosk } from './app/kiosk';
 import { setShowcase } from './ui/screens/title';
@@ -79,6 +80,7 @@ async function titleFlow() {
         music: settings.music,
         daily: { streak: currentStreak(date), stars: loadDaily().results[date]?.stars ?? 0 },
         expedition: { open: expeditionOpen(p), run: loadExpedition().run },
+        planets: planetsDone(),
         trophies: { have: have.size, total: ACHIEVEMENTS.length },
         toggleSfx: () => {
           settings.muted = !settings.muted;
@@ -96,12 +98,13 @@ async function titleFlow() {
       click,
     );
     // Behind the menu, the islands of every world take turns.
-    const kiosk = startKiosk((level) => setShowcase(WORLDS.find((w) => w.id === level.world)?.name ?? '', levelText(level).name));
+    const kiosk = startKiosk((level) => setShowcase(level.planet ? t('planets.title') : (WORLDS.find((w) => w.id === level.world)?.name ?? ''), levelText(level).name));
     const choice = await shown;
     kiosk.stop();
     last = choice;
     if (choice === 'play') await levelFlow(next ?? 0);
     else if (choice === 'worlds') await worldsFlow(next === null ? 0 : worldIndex(next));
+    else if (choice === 'planets') await planetsFlow();
     else if (choice === 'daily') await dailyFlow();
     else if (choice === 'expedition') await expeditionFlow();
     else if (choice === 'workshop') await workshopFlow();

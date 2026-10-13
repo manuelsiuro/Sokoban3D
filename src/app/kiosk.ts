@@ -1,6 +1,7 @@
 import type { LevelDef } from '../levels/types';
 import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
+import { PLANET } from '../levels/worlds/planet';
 import { screen, showLevel, view } from './context';
 
 /**
@@ -17,6 +18,8 @@ const SHOWCASE: LevelDef[] = WORLDS.map((w) => {
   const own = LEVELS.filter((l) => l.world === w.id);
   return own[Math.min(own.length - 1, 6)];
 }).filter(Boolean);
+// And a little planet among them (the Planets mode), seen whole.
+SHOWCASE.splice(4, 0, PLANET[5]);
 
 const HOLD = 9000;
 /** With reduced motion: a plain swap, less often. */
@@ -43,6 +46,7 @@ export function startKiosk(onShow: (level: LevelDef) => void): Kiosk {
     sinking = null;
     showLevel(level, { music: false });
     view.idle = true;
+    view.overview = !!level.planet;
     view.intro();
     onShow(level);
   };

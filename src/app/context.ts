@@ -66,7 +66,7 @@ screen.shown = screen.sim.state;
 
 /** Shows a level (and plays its world's music, unless `music: false`: the title's showcase). */
 export function showLevel(level: LevelDef, opts: { music?: boolean } = {}) {
-  if (opts.music !== false) sound.setMusic(settings.music, settings.musicVolume, level.world);
+  if (opts.music !== false) sound.setMusic(settings.music, settings.musicVolume, level.biome ?? level.world);
   screen.sim = new Sim(level);
   screen.shown = screen.sim.state;
   view.setLevel(level, screen.sim.grid, screen.shown);

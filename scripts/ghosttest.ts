@@ -1,11 +1,12 @@
 /** Ghosts: every level's solution replays as a ghost path that ends solved; broken runs are not shown. */
 import { LEVELS } from '../src/levels/levels';
+import { PLANET } from '../src/levels/worlds/planet';
 import { SOLUTIONS } from '../src/levels/solutions';
 import { ghostPath, runSolves } from '../src/game/ghost';
 import { check } from './assert';
 
 let steps = 0;
-for (const l of LEVELS) {
+for (const l of [...LEVELS, ...PLANET]) {
   const run = SOLUTIONS[l.id];
   if (!run) continue;
   const path = ghostPath(l, run);
@@ -16,4 +17,4 @@ for (const l of LEVELS) {
 }
 check(!runSolves(LEVELS[0], 'r'), 'a run that stops short is not a solve');
 check(ghostPath(LEVELS[0], 'lllll').length === 1, 'blocked moves end the ghost path');
-console.log(`${LEVELS.length} ghost paths, ${steps} steps`);
+console.log(`${LEVELS.length + PLANET.length} ghost paths, ${steps} steps`);

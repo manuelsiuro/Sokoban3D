@@ -12,6 +12,7 @@ import { clock, iceShader, lavaShader } from './shaders';
 import { bake, plain, roughen, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 import { CRATE_COLORS, Mechanics, dressCrate, symbolMesh, tileColor } from './mechanics';
+import { PlanetShape } from './planet';
 import { CRATE, crateModel, decorModel, disposeTree, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
 
 /** World height of one level (a crate's height, so a crate in a dip is flush with the floor). */
@@ -25,7 +26,12 @@ interface Tween {
   to: THREE.Vector3;
   /** Slides first, then drops (a crate falling off a ledge). */
   drop: boolean;
+  /** On a planet: the orientation it starts from (it turns with the ground it rolls over). */
+  q?: THREE.Quaternion;
 }
+
+const Y = new THREE.Vector3(0, 1, 0);
+const qYaw = (a: number, out = new THREE.Quaternion()) => out.setFromAxisAngle(Y, a);
 
 const hash = (s: string) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
@@ -47,9 +53,19 @@ export class View {
   /** A big island (Grand Islands): on narrow or short screens the camera frames a window around the pusher, unless the overview is on. */
   private big = false;
   get follows() {
-    return this.big && (this.camera.aspect < 1.3 || innerHeight < 560);
+    return !!this.planet || (this.big && (this.camera.aspect < 1.3 || innerHeight < 560));
   }
+  /** A planet level (cube.ts): its shape, and the camera's frame over it (up out of the planet, forward = screen up). */
+  private planet: PlanetShape | null = null;
+  private camN = new THREE.Vector3(0, 1, 0);
+  private camF = new THREE.Vector3(0, 0, -1);
+  /** The pusher's orientation at the start and end of its move (planets). */
+  private pqFrom = new THREE.Quaternion();
+  private pqTo = new THREE.Quaternion();
   overview = false;
+  /** Raises the picture by this fraction of the screen's height (a sheet covers the bottom: the Planets list). */
+  raise = 0;
+  private raised = 0;
   /** The point the camera aims at, eased toward the island's middle or the pusher. */
   private aim = new THREE.Vector3();
   private aimSpan = { radius: 5, half: 5 };
@@ -107,6 +123,7 @@ export class View {
   /** Scratch space for the frame loop (nothing is allocated per frame). */
   private tmp = new THREE.Vector3();
   private target = new THREE.Vector3();
+  private tq = new THREE.Quaternion();
   private onGoal: boolean[] = [];
   private covered = new Set<number>();
 
@@ -178,16 +195,35 @@ export class View {
 
   /** World position of a cell's floor (or of a crate/player standing at level z). */
   private pos(cell: number, z: number, out = new THREE.Vector3()) {
+    if (this.planet) return this.planet.point(cell, z, LEVEL_H, 0, out);
     const g = this.grid!;
     const x = cell % g.w;
     const y = Math.floor(cell / g.w);
     return out.set(x - (g.w - 1) / 2, z * LEVEL_H, y - (g.h - 1) / 2);
   }
 
+  /** A cell's up (+y on islands, out of the ground on planets). */
+  private upAt(cell: number) {
+    return this.planet && cell >= 0 ? this.planet.up(cell) : Y;
+  }
+
+  /** `pos` raised by h along the cell's up. */
+  private lift(cell: number, z: number, h: number, out = new THREE.Vector3()) {
+    return this.pos(cell, z, out).addScaledVector(this.upAt(cell), h);
+  }
+
+  /** Stands an object on a cell: at its floor, turned to its frame (and by yaw about its up). */
+  private stand(o: THREE.Object3D, cell: number, z: number, yaw = 0) {
+    this.pos(cell, z, o.position);
+    if (this.planet) o.quaternion.copy(this.planet.frame(cell)).multiply(qYaw(yaw));
+    else o.rotation.y = yaw;
+    return o;
+  }
+
   /** Builds the island for a level: tiles, columns, walls, goals, decor, the rock below. */
   setLevel(level: LevelDef, grid: Grid, state: GameState) {
     this.grid = grid;
-    const b = (this.biome = biomeOf(level.world));
+    const b = (this.biome = biomeOf(level.biome ?? level.world));
     // Free the previous level's meshes (geometries and the materials they own).
     disposeTree(this.world);
     this.world.clear();
@@ -215,8 +251,9 @@ export class View {
     this.sun.color.set(b.sun);
     this.sun.intensity = b.sunIntensity;
 
-    // The island: playable cells, walls, and a rim of one cell around them.
-    const W = grid.w + 2;
+    this.planet = grid.planet ? new PlanetShape(grid.planet) : null;
+    // The island: playable cells, walls, and a rim of one cell around them (planets: the ball).
+    const W = this.planet ? 0 : grid.w + 2;
     const H = grid.h + 2;
     const at = (x: number, y: number) => (x < 0 || y < 0 || x >= grid.w || y >= grid.h ? -1 : y * grid.w + x);
     const solid = (x: number, y: number) => {
@@ -238,6 +275,7 @@ export class View {
     const island: [number, number, number][] = [];
     const tops = new Map<string, number>();
     const key = (x: number, y: number) => `${x},${y}`;
+    if (this.planet) this.buildPlanet(grid, b, R);
     for (let y = -1; y < H - 1; y++)
       for (let x = -1; x < W - 1; x++) {
         const c = at(x, y);
@@ -364,11 +402,7 @@ export class View {
     // Walls, goals, decor. Walls and decor are merged into a few meshes.
     const statics = new THREE.Group();
     for (let c = 0; c < grid.w * grid.h; c++) {
-      if (grid.wall[c]) {
-        const w = wallModel(b, c);
-        this.pos(c, grid.floor[c], w.position);
-        statics.add(w);
-      }
+      if (grid.wall[c]) statics.add(this.stand(wallModel(b, c), c, grid.floor[c]));
       if (grid.goal[c]) {
         const { group, glow, column } = goalModel(b);
         if (grid.goalColor[c]) {
@@ -382,7 +416,7 @@ export class View {
             group.add(sym);
           }
         }
-        this.pos(c, grid.floor[c], group.position);
+        this.stand(group, c, grid.floor[c]);
         this.world.add(group);
         this.goals.push({ cell: c, glow, column, beam: group.getObjectByName('column')!, shown: 1 });
       }
@@ -391,7 +425,8 @@ export class View {
       this.root.remove(this.mech.group);
       this.mech.dispose();
     }
-    this.mech = new Mechanics(grid, (c, z, out) => this.pos(c, z, out), LEVEL_H);
+    const planet = this.planet;
+    this.mech = new Mechanics(grid, (c, z, out) => this.pos(c, z, out), LEVEL_H, planet ? (c) => planet.frame(c) : undefined);
     this.root.add(this.mech.group);
     for (const [x, y, z] of island) {
       if (solid(x, y) || R.next() > 0.45) continue;
@@ -407,7 +442,9 @@ export class View {
       this.scene.remove(this.air.group);
       this.air.dispose();
     }
-    this.air = new Atmosphere(b, Math.max(grid.w, grid.h) / 2 + 1, hash(level.id));
+    // Round a planet the camera looks from every side: no far-off islands (they'd hang overhead).
+    const air = this.planet ? { ...b, air: { ...b.air, far: undefined } } : b;
+    this.air = new Atmosphere(air, this.planet ? this.planet.radius + 3 : Math.max(grid.w, grid.h) / 2 + 1, hash(level.id));
     this.scene.add(this.air.group);
 
     // Crates.
@@ -424,8 +461,17 @@ export class View {
     this.center.set(0, (maxZ * LEVEL_H) / 2, 0);
     this.radius = Math.hypot(grid.w, grid.h) / 2 + 0.6;
     this.halfSpan = Math.max(grid.w, grid.h) / 2 + 1;
+    if (this.planet) {
+      this.center.set(0, 0, 0);
+      this.radius = this.halfSpan = this.planet.radius + 1.5;
+      // The camera starts over the pusher, the net's up pointing up the screen.
+      this.camN.copy(this.planet.up(grid.start));
+      this.camF.copy(this.planet.tangent(grid.start, 0));
+      this.yaw = Math.round(this.yaw / 4) * 4;
+    }
     this.big = Math.max(grid.w, grid.h) > 12;
     this.overview = false;
+    this.raise = 0;
     this.aim.copy(this.center);
     this.aimSpan = { radius: this.radius, half: this.halfSpan };
     // Shadows cover the island.
@@ -444,6 +490,56 @@ export class View {
     this.shownYaw = this.yaw;
   }
 
+  /** A planet's ground: curved tiles (checkered by cell, ice and pits in their own looks), and the rock core. */
+  private buildPlanet(grid: Grid, b: Biome, R: { next: () => number }) {
+    const planet = this.planet!;
+    const n = planet.n;
+    const col = new THREE.Color();
+    const looks = new Map<string, NonNullable<ReturnType<typeof tileColor>>>();
+    const parts = planet.ground(
+      grid,
+      LEVEL_H,
+      (c) => {
+        const x = c % grid.w;
+        const y = Math.floor(c / grid.w);
+        col.set((x + y) & 1 ? b.ground2 : b.ground);
+        // Walls stand on a darker floor; each tile varies a touch in tone.
+        if (grid.wall[c]) col.lerp(new THREE.Color(b.soil), 0.3);
+        void n;
+        return col.clone().multiplyScalar(0.97 + R.next() * 0.06);
+      },
+      (c) => {
+        const look = tileColor(grid, c);
+        if (!look) return null;
+        looks.set(`${look.color}`, look);
+        return `${look.color}`;
+      },
+    );
+    for (const [key, geo] of parts) {
+      const look = looks.get(key);
+      let m: THREE.Material;
+      if (look) {
+        const sm = mat(look.color, look.opts);
+        if (grid.tile.some((t, c) => t === TILE.ice && `${tileColor(grid, c)?.color}` === key)) iceShader(sm);
+        m = sm;
+      } else m = mat(0xffffff, { rough: 0.95, vertexColors: true });
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.receiveShadow = true;
+      mesh.castShadow = true;
+      this.world.add(mesh);
+    }
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(planet.radius - LEVEL_H - 0.1, 4), mat(b.soil, { rough: 1 }));
+    core.receiveShadow = true;
+    this.world.add(core);
+  }
+
+  /** Moves a point between two others, along the planet's curve on planets (a straight line on islands). */
+  private glide(from: THREE.Vector3, to: THREE.Vector3, e: number, out: THREE.Vector3) {
+    if (!this.planet) return out.lerpVectors(from, to, e);
+    const r = from.length() + (to.length() - from.length()) * e;
+    return out.copy(from).normalize().lerp(this.tmp.copy(to).normalize(), e).normalize().multiplyScalar(r);
+  }
+
   /**
    * Shows a state. With the previous state, the change is animated (a move, an undo);
    * without, it snaps (a restart, a new level).
@@ -458,7 +554,8 @@ export class View {
     // Slides and conveyor rides cover more ground: a little longer per extra cell.
     if (animate && prev) {
       const g = this.grid;
-      const far = (a: number, b: number) => (a < 0 || b < 0 ? 0 : Math.abs((a % g.w) - (b % g.w)) + Math.abs(Math.floor(a / g.w) - Math.floor(b / g.w)));
+      const far = (a: number, b: number) =>
+        a < 0 || b < 0 ? 0 : this.planet ? Math.round(this.planet.up(a).angleTo(this.planet.up(b)) / (Math.PI / 2 / this.planet.n)) : Math.abs((a % g.w) - (b % g.w)) + Math.abs(Math.floor(a / g.w) - Math.floor(b / g.w));
       const dist = Math.max(far(prev.cell, s.cell), ...s.crates.map((c, k) => far(prev.crates[k].cell, c.cell)));
       if (dist > 1 && !(s.events & EVENT.teleport)) this.dur = Math.min(0.5, this.dur + (dist - 1) * 0.07);
     }
@@ -469,7 +566,7 @@ export class View {
     const moved: number[] = [];
     s.crates.forEach((c, k) => {
       const view = this.crates[k];
-      const to = c.cell < 0 ? null : this.pos(c.cell, c.z).add(new THREE.Vector3(0, CRATE / 2, 0));
+      const to = c.cell < 0 ? null : this.lift(c.cell, c.z, CRATE / 2);
       const was = prev?.crates[k];
       if (!to) {
         // Fell off the island: slide one cell out, then drop out of sight.
@@ -494,12 +591,13 @@ export class View {
       view.panels.color.set(cooled ? 0x4a4048 : view.panels.userData.base);
       if (teleported && was && onPad(c.cell) && was.cell !== c.cell) this.pops.add(k);
       if (animate && was && was.cell >= 0 && (was.cell !== c.cell || was.z !== c.z)) {
-        const from = this.pos(was.cell, was.z).add(new THREE.Vector3(0, CRATE / 2, 0));
-        view.tween = { from, to, drop: c.z < was.z };
+        const from = this.lift(was.cell, was.z, CRATE / 2);
+        view.tween = { from, to, drop: c.z < was.z, q: this.planet ? view.group.quaternion.clone() : undefined };
         moved.push(k);
       } else {
         view.tween = null;
         view.group.position.copy(to);
+        if (this.planet) view.group.quaternion.copy(this.planet.frame(c.cell));
       }
     });
     // After the loop: a crate lost over the edge may have made the move longer.
@@ -519,13 +617,18 @@ export class View {
     // The model looks along +z (down); a quarter turn per direction.
     this.facing = (6 - s.facing) % 4;
     if (!animate) this.facingFrom = this.facing;
+    if (this.planet) {
+      this.pqFrom.copy(animate ? this.player.group.quaternion : this.planet.frame(s.cell).clone().multiply(qYaw(this.facing * (Math.PI / 2))));
+      this.pqTo.copy(this.planet.frame(s.cell)).multiply(qYaw(this.facing * (Math.PI / 2)));
+      if (!animate) this.player.group.quaternion.copy(this.pqTo);
+    }
     this.pushing = (s.events & EVENT.push) !== 0 && prev !== null && s.moves > prev.moves;
     this.pulling = (s.events & EVENT.pull) !== 0 && prev !== null && s.moves > prev.moves;
     // Feedback.
     if (animate && prev && s.moves > prev.moves) {
       this.skipIntro();
       const g = this.grid;
-      const at = (cell: number, z: number, y = 0.05) => this.pos(cell, z).add(new THREE.Vector3(0, y, 0));
+      const at = (cell: number, z: number, y = 0.05) => this.lift(cell, z, y);
       // A puff where the pusher took off; dust behind anything sliding on ice.
       this.fx.emit(at(prev.cell, prev.z), 0xffffff, 2, 0.5, 'puff', { size: 0.8 });
       if (s.events & EVENT.slide) {
@@ -551,11 +654,14 @@ export class View {
         this.fx.emit(at(prev.cell, prev.z, 0.4), 0xd2a8ff, 10, 1.2, 'spark', { up: 1.2 });
         this.fx.emit(at(s.cell, s.z, 0.4), 0xd2a8ff, 10, 1.2, 'spark', { up: 1.2 });
       }
-      if (s.events & EVENT.push) this.burst(pTo.clone().add(new THREE.Vector3(DX[s.facing] * 0.5, 0.05, DY[s.facing] * 0.5)), this.biome.soil, 4, 0.8);
+      if (s.events & EVENT.push) {
+        const ahead = this.planet ? this.lift(s.cell, s.z, 0.05).addScaledVector(this.planet.tangent(s.cell, s.facing), 0.5) : pTo.clone().add(new THREE.Vector3(DX[s.facing] * 0.5, 0.05, DY[s.facing] * 0.5));
+        this.burst(ahead, this.biome.soil, 4, 0.8);
+      }
       if (s.events & EVENT.goalOn) {
         const k = s.pushed;
         const c = s.crates[k];
-        if (c && c.cell >= 0) this.burst(this.pos(c.cell, c.z).add(new THREE.Vector3(0, 0.3, 0)), this.biome.goal, 14, 2.2);
+        if (c && c.cell >= 0) this.burst(this.lift(c.cell, c.z, 0.3), this.biome.goal, 14, 2.2);
       }
     }
     this.mech?.setState(s);
@@ -597,6 +703,7 @@ export class View {
   private ghost: THREE.Group | null = null;
   private ghostTo = new THREE.Vector3();
   private ghostTurn = 0;
+  private ghostCell = -1;
 
   /**
    * The ghost of the best run: a see-through pusher standing where that run was after as
@@ -627,10 +734,12 @@ export class View {
     this.pos(step.cell, step.z, this.ghostTo);
     if (wasHidden) this.ghost.position.copy(this.ghostTo);
     this.ghostTurn = ((6 - step.facing) % 4) * (Math.PI / 2);
+    this.ghostCell = step.cell;
   }
 
   private hintArrow: THREE.Group | null = null;
   private hintDir = 0;
+  private hintCell = -1;
 
   /** A bouncing arrow beside the player, pointing the way of the next move (null: none). */
   showHint(dir: number | null) {
@@ -650,6 +759,7 @@ export class View {
     this.hintArrow.visible = dir !== null;
     if (dir !== null) {
       this.hintDir = dir;
+      this.hintCell = this.state?.cell ?? -1;
       // The arrow's tip looks along -z: turn it to the direction.
       this.hintArrow.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir];
     }
@@ -666,6 +776,7 @@ export class View {
     for (const h of hits) {
       // A point just inside the surface hit, in the level's own space.
       const p = this.root.worldToLocal(h.point.clone().addScaledVector(this.ray.ray.direction, 0.05));
+      if (this.planet) return this.planet.nearest(p.normalize());
       const x = Math.round(p.x + (g.w - 1) / 2);
       const y = Math.round(p.z + (g.h - 1) / 2);
       if (x >= 0 && y >= 0 && x < g.w && y < g.h) return y * g.w + x;
@@ -683,6 +794,21 @@ export class View {
    * the current camera: "up" walks away from the camera.
    */
   screenDir(screen: number) {
+    if (this.planet && this.state) {
+      // On a planet: the net direction at the pusher's cell that best matches the screen's.
+      const f = this.tmp.copy(this.camF).applyAxisAngle(this.camN, Math.round(this.yaw) * (Math.PI / 2));
+      const want = f.applyAxisAngle(this.camN, -screen * (Math.PI / 2));
+      let best = 0;
+      let dot = -2;
+      for (let d = 0; d < 4; d++) {
+        const k = this.planet.tangent(this.state.cell, d).dot(want);
+        if (k > dot) {
+          dot = k;
+          best = d;
+        }
+      }
+      return best;
+    }
     const k = ((Math.round(this.yaw) % 4) + 4) % 4;
     return (screen - k + 4) % 4;
   }
@@ -696,7 +822,12 @@ export class View {
   celebrate() {
     if (!this.grid || this.reducedMotion) return;
     const colors = [0xffd447, 0xff6f91, 0x5fe3ff, 0x8fd16a, 0xb983ff];
-    for (let k = 0; k < 5; k++) this.fx.emit(new THREE.Vector3((Math.random() - 0.5) * this.grid.w * 0.6, 1.5, (Math.random() - 0.5) * this.grid.h * 0.6), colors[k], 14, 3, 'shard', { size: 1.4 });
+    const p = this.player.group.position;
+    const up = this.state ? this.upAt(this.state.cell) : Y;
+    for (let k = 0; k < 5; k++) {
+      const at = this.planet ? p.clone().addScaledVector(up, 1.5).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2)) : new THREE.Vector3((Math.random() - 0.5) * this.grid.w * 0.6, 1.5, (Math.random() - 0.5) * this.grid.h * 0.6);
+      this.fx.emit(at, colors[k], 14, 3, 'shard', { size: 1.4 });
+    }
   }
 
   /** The level comes in: the camera flies down while the island rises from the clouds. */
@@ -751,7 +882,9 @@ export class View {
       } else if (this.pops.has(k)) {
         c.group.position.copy(t < 0.5 ? from : to);
         c.group.scale.setScalar(Math.max(0.05, Math.abs(1 - 2 * t)));
-      } else c.group.position.lerpVectors(from, to, ease);
+      } else this.glide(from, to, ease, c.group.position);
+      // On a planet the crate rolls with the ground: turned as far as its up has turned.
+      if (c.tween.q) c.group.quaternion.setFromUnitVectors(this.tmp.copy(from).normalize(), this.target.copy(c.group.position).normalize()).multiply(c.tween.q);
       if (t >= 1) {
         c.group.scale.setScalar(1);
         c.group.position.copy(to);
@@ -766,6 +899,9 @@ export class View {
       if (this.pops.has(-1)) {
         p.group.position.copy(t < 0.5 ? from : to);
         p.group.scale.setScalar(Math.max(0.05, Math.abs(1 - 2 * t)));
+      } else if (this.planet) {
+        this.glide(from, to, ease, p.group.position);
+        p.group.position.addScaledVector(this.tmp.copy(p.group.position).normalize(), Math.sin(Math.PI * t) * this.hop);
       } else {
         p.group.position.lerpVectors(from, to, ease);
         const climbing = to.y !== from.y;
@@ -777,9 +913,16 @@ export class View {
         this.playerTween = null;
       }
     }
-    let df = this.facing - this.facingFrom;
-    df = ((((df + 2) % 4) + 4) % 4) - 2;
-    p.group.rotation.y = (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2);
+    if (this.planet) {
+      // Turn toward the move, then stand up straight on the ground it's over.
+      const q = p.group.quaternion.slerpQuaternions(this.pqFrom, this.pqTo, Math.min(1, t * 1.8));
+      const up = this.tmp.set(0, 1, 0).applyQuaternion(q);
+      q.premultiply(this.tq.setFromUnitVectors(up, this.target.copy(p.group.position).normalize()));
+    } else {
+      let df = this.facing - this.facingFrom;
+      df = ((((df + 2) % 4) + 4) % 4) - 2;
+      p.group.rotation.y = (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2);
+    }
     // Lean into a push, lean back hauling a pull; a little bob while idle; a happy spin once solved.
     p.body.rotation.x = (this.pushing ? 0.25 : this.pulling ? -0.3 : 0) * (t < 1 ? Math.sin(Math.PI * t) : 0);
     p.body.position.y = this.reducedMotion ? 0 : Math.max(0, Math.sin(time * 3) * 0.015);
@@ -859,16 +1002,25 @@ export class View {
     }
     this.mech?.update(time, dt);
     if (this.ghost?.visible) {
-      this.ghost.position.lerp(this.ghostTo, Math.min(1, dt * 14));
-      let d = this.ghostTurn - this.ghost.rotation.y;
-      d = Math.atan2(Math.sin(d), Math.cos(d));
-      this.ghost.rotation.y += d * Math.min(1, dt * 12);
+      if (this.planet && this.ghostCell >= 0) {
+        this.glide(this.ghost.position.clone(), this.ghostTo, Math.min(1, dt * 14), this.ghost.position);
+        this.ghost.quaternion.slerp(this.tq.copy(this.planet.frame(this.ghostCell)).multiply(qYaw(this.ghostTurn)), Math.min(1, dt * 12));
+      } else {
+        this.ghost.position.lerp(this.ghostTo, Math.min(1, dt * 14));
+        let d = this.ghostTurn - this.ghost.rotation.y;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        this.ghost.rotation.y += d * Math.min(1, dt * 12);
+      }
     }
     if (this.hintArrow?.visible && this.state) {
       // Follows the pusher as it moves (the state's cell is already the end of the move).
       const at = this.player.group.position;
       const bob = 0.55 + (this.reducedMotion ? 0 : Math.sin(time * 6) * 0.08);
-      this.hintArrow.position.set(at.x + DX[this.hintDir] * bob, at.y + 0.5, at.z + DY[this.hintDir] * bob);
+      if (this.planet && this.hintCell >= 0) {
+        const c = this.hintCell;
+        this.hintArrow.position.copy(at).addScaledVector(this.planet.up(c), 0.5).addScaledVector(this.planet.tangent(c, this.hintDir), bob);
+        this.hintArrow.quaternion.copy(this.planet.frame(c)).multiply(qYaw([0, -Math.PI / 2, Math.PI, Math.PI / 2][this.hintDir]));
+      } else this.hintArrow.position.set(at.x + DX[this.hintDir] * bob, at.y + 0.5, at.z + DY[this.hintDir] * bob);
     }
     this.fx.update(dt);
     if (!this.reducedMotion) {
@@ -876,6 +1028,13 @@ export class View {
       for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
     }
     this.placeCamera(dt);
+    // Glide the picture up or down (a view offset, so nothing else about the camera changes).
+    // On a tall screen a planet also sits a little higher, clear of the touch controls.
+    const goal = this.raise || (this.planet && this.camera.aspect < 0.8 ? 0.1 : 0);
+    const was = this.raised;
+    this.raised = this.reducedMotion || Math.abs(goal - was) < 1e-3 ? goal : was + (goal - was) * Math.min(1, dt * 6);
+    if (this.raised) this.camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * this.raised, innerWidth, innerHeight);
+    else if (was) this.camera.clearViewOffset();
     clock.value = time;
     this.post.render(this.scene, this.camera, time);
   }
@@ -883,6 +1042,7 @@ export class View {
   private placeCamera(dt: number) {
     if (this.orbiting && !this.reducedMotion) this.yaw += dt * 0.04;
     this.shownYaw += (this.yaw - this.shownYaw) * Math.min(1, dt * (this.orbiting ? 2 : 6));
+    if (this.planet) return this.placePlanetCamera(dt);
     let a = this.shownYaw * (Math.PI / 2);
     let pitch = 1.08;
     // Far enough that the island fits both ways: its depth up and down, its width across.
@@ -925,6 +1085,55 @@ export class View {
     // On tall screens, aim a little toward the camera: the island rises above the touch controls.
     const lift = this.camera.aspect < 1 ? 0.9 : 0;
     this.camera.lookAt(c.x + Math.sin(a) * lift, c.y - 0.3, c.z + Math.cos(a) * lift);
+    this.shakeCamera(dt);
+  }
+
+  /**
+   * Over a planet: the camera rides above the pusher, tilted to look ahead, with the screen's
+   * up along `camF`. Its frame is carried along as the pusher walks (projected onto the new
+   * ground each frame), so over an edge the view rolls smoothly instead of flipping. The
+   * overview pulls back to see the whole planet.
+   */
+  private placePlanetCamera(dt: number) {
+    const planet = this.planet!;
+    const glide = Math.min(1, dt * 3.2);
+    const p = this.player.group.position;
+    const up = this.tmp.copy(p).normalize();
+    this.camN.lerp(up, this.reducedMotion ? 1 : glide).normalize();
+    this.camF.addScaledVector(this.camN, -this.camF.dot(this.camN)).normalize();
+    const n = this.camN;
+    const f = this.target.copy(this.camF).applyAxisAngle(n, this.shownYaw * (Math.PI / 2));
+    const tan = Math.tan((this.camera.fov * Math.PI) / 360);
+    // Enough to see the pusher's face and the ones around it; more on narrow screens.
+    const fit = (planet.radius + 1.6) / tan / Math.min(1, this.camera.aspect * 1.15);
+    let dist = this.overview ? fit * 1.25 : fit * 0.9;
+    let pitch = this.overview ? 1.35 : 1.38;
+    if (this.introE >= 0) {
+      const k = (1 - this.introE) ** 3;
+      dist *= 1 + 0.9 * k;
+      pitch += 0.2 * k;
+    }
+    if (this.wonAt >= 0 && !this.reducedMotion) {
+      const w = Math.min(1, (this.now - this.wonAt) / 1.6);
+      dist *= 1 + 0.15 * w * w * (3 - 2 * w);
+    }
+    // Aim at the pusher, seen from behind and above: its face, and the curve over to the next.
+    const ground = this.aim.copy(n).multiplyScalar(this.overview ? 0 : planet.radius);
+    this.camera.position.copy(ground).addScaledVector(n, Math.sin(pitch) * dist).addScaledVector(f, -Math.cos(pitch) * dist);
+    // Look a little ahead.
+    const look = ground.addScaledVector(f, 0.6);
+    this.camera.up.copy(f);
+    this.camera.lookAt(look);
+    // The sun follows the camera, a little to one side, so the face in play is lit.
+    const side = this.tmp.copy(f).cross(n);
+    this.sun.position.copy(n).multiplyScalar(14).addScaledVector(f, -4).addScaledVector(side, 6);
+    this.sun.target.position.set(0, 0, 0);
+    this.fog.near = dist * 0.9;
+    this.fog.far = dist + 50;
+    this.shakeCamera(dt);
+  }
+
+  private shakeCamera(dt: number) {
     if (this.shakeAmp > 0.002) {
       const s = this.shakeAmp;
       this.camera.position.add(this.tmp.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));

@@ -156,13 +156,17 @@ export class Mechanics {
     private g: Grid,
     private pos: Pos,
     private levelH: number,
+    /** On planets: each cell's frame (x net right, y up, z net down); things set on a cell turn with it. */
+    frame?: (cell: number) => THREE.Quaternion,
   ) {
     this.group.add(this.beams);
     // Parts that never move are baked into a few meshes at the end.
     const statics = new THREE.Group();
+    let cell = -1;
     const place = (o: THREE.Object3D, at: THREE.Vector3, rotY = 0) => {
       o.position.copy(at);
       o.rotation.y = rotY;
+      if (frame && cell >= 0) o.quaternion.premultiply(frame(cell));
       return o;
     };
     const metal = mat(0x737a88, { metal: 0.25, rough: 0.45 });
@@ -170,6 +174,7 @@ export class Mechanics {
     for (let c = 0; c < g.w * g.h; c++) {
       const t = g.tile[c];
       const at = pos(c, g.floor[c]);
+      cell = c;
       const ch = CHANNEL[g.param[c]] ?? 0xffffff;
       if (t === TILE.plate) {
         // A metal ring set in the floor, and the colored button that sinks.
@@ -264,20 +269,22 @@ export class Mechanics {
         pad.add(place(new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.44, 0.025, 6), mat(0x7a808c, { metal: 0.6, rough: 0.3 })), new THREE.Vector3(0, 0.052, 0)));
         pad.add(place(new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.018, 4, 6).rotateX(Math.PI / 2).rotateY(Math.PI / 6), mat(color, { emissive: color, emissiveIntensity: 0.9 })), new THREE.Vector3(0, 0.066, 0)));
         statics.add(place(pad, at));
+        // The moving parts stand on the pad in a holder of their own (turned with the cell on planets).
+        const holder = place(new THREE.Group(), at);
         const core = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.02, 6), swirlShader(mat(color, { emissive: color, emissiveIntensity: 1.1, rough: 0.3 })));
-        core.position.copy(at).add(new THREE.Vector3(0, 0.068, 0));
+        core.position.y = 0.068;
         core.receiveShadow = true;
         // A faint column of light, and sparks rising around it.
         const col = new THREE.Mesh(COLUMN, glowOf(color, 0.15, true));
-        col.position.copy(at).add(new THREE.Vector3(0, 0.07, 0));
+        col.position.y = 0.07;
         col.renderOrder = 4;
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3));
         const sparks = new THREE.Points(geo, sparkOf(color, 0.12));
-        sparks.position.copy(at);
         sparks.frustumCulled = false;
         this.pads.push({ sparks, at, seed: c * 0.731 });
-        this.group.add(core, col, sparks);
+        holder.add(core, col, sparks);
+        this.group.add(holder);
       } else if (t === TILE.emitter) {
         const o = new THREE.Group();
         o.add(place(new THREE.Mesh(new RoundedBoxGeometry(0.7, 0.55, 0.7, 2, 0.06), mat(0x5e6472, { metal: 0.3, rough: 0.45 })), new THREE.Vector3(0, 0.28, 0)));

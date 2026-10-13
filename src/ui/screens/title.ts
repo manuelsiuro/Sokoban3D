@@ -20,7 +20,7 @@ export function setShowcase(world: string, level: string) {
   el.classList.add('in');
 }
 
-export type TitleChoice = 'play' | 'worlds' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install' | 'help';
+export type TitleChoice = 'play' | 'worlds' | 'planets' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install' | 'help';
 
 export interface TitleInfo {
   stars: number;
@@ -41,6 +41,8 @@ export interface TitleInfo {
   /** Flip the effects or the music; each returns whether it's now on. */
   toggleSfx: () => boolean;
   toggleMusic: () => boolean;
+  /** Planets: how many are solved, out of how many. */
+  planets: { solved: number; levels: number };
   /** Expedition: open once the Meadow is cleared; the run in progress, if any. */
   expedition: { open: boolean; run: { depth: number; score: number } | null };
 }
@@ -68,11 +70,18 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           <span class="hero-text"><b>${t(info.next && !info.fresh ? 'title.continue' : 'title.play')}</b><small>${sub}</small></span>
           <span class="pill">${icon('star', 14)} ${info.stars}/${info.maxStars}</span>
         </button>
-        <button class="menu-btn" data-c="worlds" style="--tone:#4fae4a;--tone-2:#2f8a3a;--done:${done}%">
-          <span class="menu-ic">${icon('map', 18)}</span>
-          <span class="menu-text"><span class="menu-label">${t('title.worlds')}</span><small>${t('title.worldsSub', { open: info.worldsOpen, worlds: info.worlds, solved: info.solved, levels: info.levels })}</small></span>
-          ${icon('chevronRight', 16)}<i class="menu-bar"></i>
-        </button>
+        <div class="menu-pair">
+          <button class="menu-btn" data-c="worlds" style="--tone:#4fae4a;--tone-2:#2f8a3a;--done:${done}%">
+            <span class="menu-ic">${icon('map', 18)}</span>
+            <span class="menu-text"><span class="menu-label">${t('title.worlds')}</span><small>${t('title.worldsShort', { open: info.worldsOpen, worlds: info.worlds })}</small></span>
+            <i class="menu-bar"></i>
+          </button>
+          <button class="menu-btn" data-c="planets" style="--tone:#3f7fe0;--tone-2:#2a55b8;--done:${((info.planets.solved / Math.max(1, info.planets.levels)) * 100).toFixed(1)}%">
+            <span class="menu-ic">${icon('globe', 18)}</span>
+            <span class="menu-text"><span class="menu-label">${t('title.planets')}${info.planets.solved ? '' : ` <em class="menu-new">${t('title.new')}</em>`}</span><small>${t('title.planetsSub', { solved: info.planets.solved, levels: info.planets.levels })}</small></span>
+            <i class="menu-bar"></i>
+          </button>
+        </div>
         <div class="menu-pair">
           <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
             <span class="menu-ic">${icon('star', 18)}</span>

@@ -1,10 +1,10 @@
-import { EVENT, inputOf, type GameState } from '../sim/Sim';
+import { EVENT, inputOf, neighbour, type GameState } from '../sim/Sim';
 import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
 import { buzz } from '../app/haptics';
 import { startGamepad } from '../app/gamepad';
-import { DX, DY, TILE } from '../sim/grid';
+import { TILE } from '../sim/grid';
 import { walkTo } from '../game/path';
 import { Coach } from './coach';
 import { levelText, t, type Key } from '../i18n';
@@ -139,6 +139,11 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
     $('.hud-grab').classList.toggle('gone', !screen.sim.grid.pull || !!opts.autoplay);
     $('.hud-view').classList.toggle('gone', !view.follows);
     $('.hud-view').classList.remove('on');
+    // On a planet the overview is the whole globe.
+    const globe = screen.sim.grid.planet > 0;
+    $('.hud-view').innerHTML = icon(globe ? 'globe' : 'map');
+    $('.hud-view').dataset.l = globe ? 'hud.globe' : 'hud.overview';
+    $('.hud-view').setAttribute('aria-label', t(globe ? 'hud.globe' : 'hud.overview'));
     setGrab(false);
     setText($('.hud-count'), String(opts.skip ?? ''));
     hud.classList.toggle('watching', !!opts.autoplay);
@@ -306,12 +311,11 @@ function tapCell(cell: number) {
   stopWalk();
   const g = screen.sim.grid;
   const at = screen.shown.cell;
-  const dx = (cell % g.w) - (at % g.w);
-  const dy = Math.floor(cell / g.w) - Math.floor(at / g.w);
-  if (Math.abs(dx) + Math.abs(dy) === 1) {
-    const d = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+  // Next door (over a planet's edge too): a single step that way.
+  const d = [0, 1, 2, 3].find((k) => neighbour(g, at, k) === cell);
+  if (d !== undefined) {
     // Pull levels: a step away from a crate right behind pulls it.
-    const behind = (at % g.w) - DX[d] + (Math.floor(at / g.w) - DY[d]) * g.w;
+    const behind = neighbour(g, at, (d + 2) % 4);
     const pull = g.pull && screen.shown.crates.some((c) => c.cell === behind && c.z === screen.shown.z);
     moveGrid(d + (pull ? 4 : 0));
     return;

@@ -6,6 +6,7 @@ import type { Progress } from './progress';
 import { KEYS, readJSON, writeJSON } from './storage';
 import { medalFor } from './score';
 import { GRANDS } from '../levels/grand';
+import { PLANET } from '../levels/worlds/planet';
 import { t } from '../i18n';
 
 /**
@@ -50,6 +51,7 @@ export const OUTFITS: Outfit[] = [
   { id: 'hardhat', get name() { return t('outfit.hardhat'); }, cap: 0xffc23d, suit: 0xe8763a },
   { id: 'mirror', get name() { return t('outfit.mirror'); }, cap: 0xff8fd0, suit: 0x7a5fb0 },
   { id: 'navigator', get name() { return t('outfit.navigator'); }, cap: 0x2fb8a8, suit: 0xd9b27a },
+  { id: 'astronaut', get name() { return t('outfit.astronaut'); }, cap: 0xf2f4f8, suit: 0x3a4a7a },
 ];
 
 export interface Ctx {
@@ -101,6 +103,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     return { id: `grand-${g.world}`, get name() { return t('trophy.grand.name', { world: world() }); }, get desc() { return t('trophy.grand.desc', { world: world() }); }, count: (c) => ((c.progress[g.id]?.stars ?? 0) > 0 ? 1 : 0), goal: 1 };
   }),
   { id: 'tour', get name() { return t('trophy.tour.name'); }, get desc() { return t('trophy.tour.desc'); }, reward: { skin: 'marble' }, count: (c) => GRANDS.filter((g) => (c.progress[g.id]?.stars ?? 0) > 0).length, goal: GRANDS.length },
+  { id: 'planet', get name() { return t('trophy.planet.name'); }, get desc() { return t('trophy.planet.desc'); }, count: (c) => Math.min(1, solved(c, PLANET.map((l) => l.id))), goal: 1 },
+  { id: 'planets', get name() { return t('trophy.planets.name'); }, get desc() { return t('trophy.planets.desc'); }, reward: { outfit: 'astronaut' }, count: (c) => solved(c, PLANET.map((l) => l.id)), goal: PLANET.length },
   { id: 'champion', get name() { return t('trophy.champion.name'); }, get desc() { return t('trophy.champion.desc'); }, reward: { skin: 'royal' }, count: (c) => solved(c, ids()), goal: ids().length },
   { id: 'perfect', get name() { return t('trophy.perfect.name'); }, get desc() { return t('trophy.perfect.desc'); }, reward: { skin: 'gold' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.stars ?? 0) >= 3).length, goal: ids().length },
 ];

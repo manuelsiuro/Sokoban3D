@@ -1,0 +1,19 @@
+ok   N=2: 24 cells, links mutual
+ok   N=2: every straight walk loops in 4N steps
+ok   N=3: 54 cells, links mutual
+ok   N=3: every straight walk loops in 4N steps
+ok   N=5: 150 cells, links mutual
+ok   N=5: every straight walk loops in 4N steps
+ok   walk F → T over the edge
+ok   walk T → L turns the heading
+ok   push over an edge
+ok   push on across the top, onto the goal
+ok   push T → L
+ok   push on down L
+ok   a slide round the planet stops before the pusher
+ok   teleport to the far side
+ok   a wall off the planet is refused
+solution dDrdLLL (212 states)
+ok   solution replays and solves
+ok   moves string round-trips
+ok   undo/redo across seams

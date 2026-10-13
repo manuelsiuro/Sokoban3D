@@ -2,6 +2,7 @@ import { h } from '../dom';
 import { icon } from '../icons';
 import { t, type Key } from '../../i18n';
 import { TOUCH } from '../dom';
+import { PLANET_PIC } from './planets';
 import { WORLDS } from '../../levels/worlds';
 
 /**
@@ -192,7 +193,8 @@ function worlds(info: HelpInfo) {
 
 function modes() {
   const mode = (ic: string, k: string) => `<section class="help-row"><span class="help-ic">${icon(ic, 24)}</span><div><h3>${t(`help.m.${k}.t` as Key)}</h3><p>${t(`help.m.${k}` as Key)}</p></div></section>`;
-  return mode('star', 'daily') + mode('compass', 'exp') + mode('clock', 'trial') + mode('crown', 'grand') + mode('hammer', 'workshop');
+  const planets = `<section class="help-row">${PLANET_PIC}<div><h3>${t('help.m.planets.t')}</h3><p>${t('help.m.planets')}</p></div></section>`;
+  return mode('star', 'daily') + planets + mode('compass', 'exp') + mode('clock', 'trial') + mode('crown', 'grand') + mode('hammer', 'workshop');
 }
 
 /** The How to play sheet; resolves when closed. */

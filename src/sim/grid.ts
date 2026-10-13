@@ -1,4 +1,5 @@
 import type { LevelDef } from '../levels/types';
+import { cubeNet } from './cube';
 
 /** No floor at all: things that go there fall off the island. */
 export const VOID = -100;
@@ -60,6 +61,11 @@ export interface Grid {
   classic: boolean;
   /** Pull rules: moves 4–7 step away dragging the crate behind; crates are never pushed. */
   pull: boolean;
+  /** Planet levels: the cube's size N (0 on islands). The map is the cube's net (cube.ts). */
+  planet: number;
+  /** Per cell × 4 directions: the neighbour (-1: none) and the direction on arrival (crossing a planet's edge turns it). */
+  link: Int16Array;
+  turn: Int8Array;
 }
 
 export const DX = [0, 1, 0, -1];
@@ -99,8 +105,12 @@ const TILE_CHARS: Record<string, [number, number]> = {
 };
 
 export function parseLevel(level: LevelDef): Grid {
-  const h = level.map.length;
-  const w = Math.max(...level.map.map((r) => r.length));
+  // A planet's map is its cube's net, padded to full size (rows may stop early).
+  const size = level.planet ?? 0;
+  if (size && (!Number.isInteger(size) || size < 2 || size > 8)) throw new Error(`${level.id}: planet size ${size} out of range`);
+  const h = size ? 3 * size : level.map.length;
+  const w = size ? 4 * size : Math.max(...level.map.map((r) => r.length));
+  if (size && (level.map.length > h || level.map.some((r) => r.length > w))) throw new Error(`${level.id}: a planet of size ${size} has a ${w}×${h} net`);
   const n = w * h;
   const ch = (x: number, y: number) => level.map[y]?.[x] ?? ' ';
   const layer = (rows: string[] | undefined, x: number, y: number) => rows?.[y]?.[x] ?? ' ';
@@ -143,20 +153,20 @@ export function parseLevel(level: LevelDef): Grid {
       if (t[0] !== TILE.plain || k !== ' ') special = true;
     }
   if (start < 0) throw new Error(`${level.id}: no player`);
+  const planet = size;
+  const { link, turn } = planet ? planetLinks(level, planet, tile) : flatLinks(w, h);
+  const net = planet ? cubeNet(planet) : null;
   // Inside: every cell reachable from the player without crossing walls or holes.
   const inside = new Uint8Array(n);
   const todo = [start];
   inside[start] = 1;
   while (todo.length) {
     const i = todo.pop()!;
-    const x = i % w;
-    const y = (i - x) / w;
     for (let d = 0; d < 4; d++) {
-      const nx = x + DX[d];
-      const ny = y + DY[d];
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-      const j = ny * w + nx;
-      const c = ch(nx, ny);
+      const j = link[i * 4 + d];
+      if (j < 0) continue;
+      const x = j % w;
+      const c = ch(x, (j - x) / w);
       if (inside[j] || c === '#' || c === ',') continue;
       inside[j] = 1;
       todo.push(j);
@@ -167,7 +177,8 @@ export function parseLevel(level: LevelDef): Grid {
     const y = (i - x) / w;
     const c = ch(x, y);
     // Floor: reached from the player, or marked: '-', walls' bases, anything with a crate, goal or the player on it.
-    if (inside[i] || '#-$*.@+'.includes(c)) {
+    // On a planet, the whole surface is floor.
+    if (net ? net.face[i] >= 0 : inside[i] || '#-$*.@+'.includes(c)) {
       const d = level.heights?.[y]?.[x] ?? '0';
       if (!/[0-9]/.test(d)) throw new Error(`${level.id}: bad height '${d}'`);
       floor[i] = Number(d) - (tile[i] === TILE.pit || tile[i] === TILE.lava ? 1 : 0);
@@ -217,5 +228,45 @@ export function parseLevel(level: LevelDef): Grid {
     gates: gateCells.length > 0,
     classic: !special && heights.size === 1 && !level.map.some((r) => r.includes(',')) && level.rules !== 'pull',
     pull: level.rules === 'pull',
+    planet,
+    link,
+    turn,
   };
+}
+
+/** An island: neighbours on the grid, edges lead nowhere, nothing turns. */
+function flatLinks(w: number, h: number) {
+  const link = new Int16Array(w * h * 4);
+  const turn = new Int8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const x = i % w;
+    const y = (i - x) / w;
+    for (let d = 0; d < 4; d++) {
+      const nx = x + DX[d];
+      const ny = y + DY[d];
+      link[i * 4 + d] = nx < 0 || ny < 0 || nx >= w || ny >= h ? -1 : ny * w + nx;
+      turn[i * 4 + d] = d;
+    }
+  }
+  return { link, turn };
+}
+
+/** A planet: the net's seams. Only what reads well on a small round world is allowed. */
+function planetLinks(level: LevelDef, size: number, tile: Uint8Array) {
+  const net = cubeNet(size);
+  if (level.heights?.some((r) => /[1-9]/.test(r))) throw new Error(`${level.id}: planets have no heights`);
+  if (level.rules) throw new Error(`${level.id}: planets use push rules`);
+  for (let i = 0; i < net.w * net.h; i++) {
+    const x = i % net.w;
+    const y = (i - x) / net.w;
+    const c = level.map[y]?.[x] ?? ' ';
+    const t = tile[i];
+    if (net.face[i] < 0) {
+      if (c !== ' ' || t !== TILE.plain) throw new Error(`${level.id}: '${c}' off the planet at ${x},${y}`);
+      continue;
+    }
+    if (c === ',' || c === '-') throw new Error(`${level.id}: '${c}' has no meaning on a planet`);
+    if (t !== TILE.plain && t !== TILE.ice && t !== TILE.pit && t !== TILE.teleport) throw new Error(`${level.id}: that tile isn't used on planets (${x},${y})`);
+  }
+  return { link: net.link, turn: net.turn };
 }
