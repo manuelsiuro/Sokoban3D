@@ -2,8 +2,8 @@ import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
 import type { LevelDef } from '../levels/types';
 import { click, map, newTrophies, par, screen, settings, showLevel, sound, summary, view, worldIndex } from '../app/context';
-import { OPENS_AFTER, isUnlocked, isWorldOpen, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
-import { starLimits, starsFor } from '../game/score';
+import { OPENS_AFTER, isUnlocked, isWorldOpen, saveTime, worldCleared, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
+import { formatTime, medalFor, medalTimes, starLimits, starsFor } from '../game/score';
 import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
 import { KEYS as STORE, readJSON, writeJSON } from '../game/storage';
@@ -70,9 +70,45 @@ export async function levelFlow(index: number): Promise<number> {
   }
 }
 
+const MEDAL_KEYS = ['trial.noMedal', 'trial.bronze', 'trial.silver', 'trial.gold'] as const;
+
+/** Time Trial: a solved level against the clock, through Next inside its world; the best time's ghost runs alongside. */
+export async function timeTrialFlow(index: number): Promise<number> {
+  for (;;) {
+    const level = LEVELS[index];
+    const p = par(index);
+    const saved = loadProgress()[level.id];
+    const r = await play(level, t('trial.label', { label: campaignLabel(level) }), p, { timed: { ghost: saved?.timeRun } });
+    if (!r || r.time === undefined) return index;
+    const medal = medalFor(r.time, p);
+    const best = saveTime(level.id, r.time, r.moves, r.at ?? []);
+    const extra = newTrophies();
+    const times = medalTimes(p);
+    const nextMedal = medal < 3 ? t('trial.nextMedal', { medal: t((['medal.bronze', 'medal.silver', 'medal.gold'] as const)[medal]), time: formatTime(times[medal]) }) : t('trial.goldDone');
+    const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === level.world ? index + 1 : -1;
+    const choice = await summary({
+      stars: medal,
+      moves: r.state.moves,
+      pushes: r.state.pushes,
+      par: p,
+      limits: starLimits(p),
+      best,
+      clean: r.clean,
+      hasNext: next >= 0,
+      extra,
+      time: { text: formatTime(r.time), medal: t(MEDAL_KEYS[medal]), next: nextMedal, gold: medal === 3 },
+    });
+    if (choice === 'levels') return index;
+    if (choice === 'next') {
+      await view.leave();
+      index = next;
+    }
+  }
+}
+
 /** The world map: pick a world and a level, play, come back to the same world. */
 export async function worldsFlow(start: number) {
-  let at = { world: start, sheet: false };
+  let at = { world: start, sheet: false, timed: false };
   for (;;) {
     const p = loadProgress();
     screen.mode = 'map';
@@ -90,12 +126,25 @@ export async function worldsFlow(start: number) {
         opensAfter: OPENS_AFTER[w.id] ? WORLDS.find((x) => x.id === OPENS_AFTER[w.id])?.name : undefined,
         gate: worldGate(k),
         soon: levels.length === 0,
-        levels: levels.map(({ l, i }) => ({ index: i, name: levelText(l).name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
+        trial: worldCleared(w.id, p),
+        levels: levels.map(({ l, i }) => ({
+          index: i,
+          name: levelText(l).name,
+          difficulty: l.difficulty,
+          stars: p[l.id]?.stars ?? 0,
+          unlocked: isUnlocked(i, p),
+          best: p[l.id]?.moves ?? 0,
+          par: par(i),
+          clean: !!p[l.id]?.clean,
+          time: p[l.id]?.time,
+          medal: p[l.id]?.time !== undefined ? medalFor(p[l.id].time!, par(i)) : 0,
+          gold: medalTimes(par(i))[2],
+        })),
       };
     });
     const i = await showWorlds(cards, at, { select: (k) => (map.select(k), sound.setMusic(settings.music, settings.musicVolume, WORLDS[k].id)), pick: (x, y) => map.pick(x, y) }, click);
     if (i === null) return;
-    const last = await levelFlow(i);
-    at = { world: worldIndex(last), sheet: true };
+    const last = i.timed ? await timeTrialFlow(i.index) : await levelFlow(i.index);
+    at = { world: worldIndex(last), sheet: true, timed: i.timed };
   }
 }

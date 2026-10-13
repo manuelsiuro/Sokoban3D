@@ -50,8 +50,15 @@
 }
 
 /* Moves against par: the count big, the par beside it. */
-.hud-moves.pill.big {
+/* The moves (and, in Time Trial, the clock) at the top right. */
+.hud-pills {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
+}
+
+.hud-moves.pill.big,
+.hud-timer.pill.big {
   height: 46px;
   padding: 0 16px;
   border-radius: 14px;
@@ -301,4 +308,46 @@
   color: white;
   background: linear-gradient(180deg, #b48cff, #7a5fb0);
   box-shadow: 0 6px 16px -6px rgba(122, 95, 176, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.hud-timer.pill.big {
+  position: relative;
+  gap: 6px;
+  min-width: 96px;
+  color: #c0392b;
+}
+
+.hud-timer.gone {
+  display: none;
+}
+
+.hud-timer b {
+  font: 700 22px/1 var(--font-display);
+}
+
+/* Undo's two-second penalty, rising and fading over the clock. */
+.hud-pen {
+  position: absolute;
+  top: -4px;
+  right: 8px;
+  font: 700 14px var(--font-display);
+  font-style: normal;
+  color: #e0433a;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-pen.show {
+  animation: pen-up 0.9s var(--ease);
+}
+
+@keyframes pen-up {
+  0% {
+    opacity: 1;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
 }

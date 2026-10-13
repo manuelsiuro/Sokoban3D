@@ -1,6 +1,7 @@
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
 import { t } from '../../i18n';
+import { formatTime } from '../../game/score';
 
 export interface LevelCard {
   /** Index in the campaign. */
@@ -13,6 +14,10 @@ export interface LevelCard {
   best: number;
   par: number;
   clean: boolean;
+  /** Time Trial: best time (ms), its medal (0–3), and the gold time. */
+  time?: number;
+  medal: number;
+  gold: number;
 }
 
 export interface WorldCard {
@@ -29,6 +34,8 @@ export interface WorldCard {
   gate: number;
   /** No levels yet. */
   soon: boolean;
+  /** Cleared: its levels can be played against the clock. */
+  trial: boolean;
   levels: LevelCard[];
 }
 
@@ -41,6 +48,14 @@ export interface MapHooks {
 
 const pips = (n: number) => `<span class="level-diff" title="${t('worlds.difficulty', { n })}">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
 const state = (l: LevelCard, next: boolean) => (!l.unlocked ? 'locked' : l.stars >= 3 ? 'solved perfect' : l.stars ? 'solved' : next ? 'next' : '');
+const MEDALS = ['', 'bronze', 'silver', 'gold'];
+/** A level card in Time Trial: the medal won and the best time (or the time for gold). */
+const timedCard = (l: LevelCard, i: number) => `<button class="level-card timed ${l.medal ? `medal-${MEDALS[l.medal]}` : ''}" data-i="${l.index}" style="animation-delay:${i * 0.03}s">
+    <span class="level-num">${i + 1}</span>
+    <span class="level-name">${l.name}</span>
+    <span class="level-medal">${l.medal ? icon('trophy', 22) : icon('clock', 22)}</span>
+    <span class="level-best">${l.time !== undefined ? t('trial.best', { time: formatTime(l.time) }) : t('trial.goldIn', { time: formatTime(l.gold) })}</span>
+  </button>`;
 const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="level-card ${state(l, all.find((x) => x.unlocked && !x.stars) === l)}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
     <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
     ${l.clean ? `<span class="level-badge" title="${t('worlds.clean')}">${icon('feather', 18)}</span>` : ''}
@@ -54,8 +69,9 @@ const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="leve
  * The world map's overlay: the selected world's card (‹ › or swipe to change, tap an island
  * to pick it), and a sheet of its levels. Resolves with a level index, or null for back.
  */
-export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: boolean }, map: MapHooks, click: () => void): Promise<number | null> {
+export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: boolean; timed?: boolean }, map: MapHooks, click: () => void): Promise<{ index: number; timed: boolean } | null> {
   let k = start.world;
+  let timed = !!start.timed;
   const total = worlds.reduce((n, w) => n + w.stars, 0);
   const max = worlds.reduce((n, w) => n + w.maxStars, 0);
   const el = h(
@@ -91,8 +107,12 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
         ${w.open ? `<button class="big-btn primary" data-open>${icon('play', 16)} ${t('worlds.levels')}</button>` : ''}
       </div>
       <button class="icon-btn world-next" data-step="1" aria-label="${t('worlds.next')}" ${k === worlds.length - 1 ? 'disabled' : ''}>${icon('chevronRight')}</button>`;
-    sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${w.mechanic}</small></h3><button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button></div>
-      <div class="level-grid">${w.levels.map((l, i) => card(l, i, w.levels)).join('')}</div>`;
+    const trial = w.trial && timed;
+    const toggle = w.trial
+      ? `<div class="seg" role="tablist"><button class="${trial ? '' : 'on'}" data-mode="moves" role="tab" aria-selected="${!trial}">${icon('star', 14)} ${t('trial.moves')}</button><button class="${trial ? 'on' : ''}" data-mode="time" role="tab" aria-selected="${trial}">${icon('clock', 14)} ${t('trial.time')}</button></div>`
+      : '';
+    sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${trial ? t('trial.about') : w.mechanic}</small></h3>${toggle}<button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button></div>
+      <div class="level-grid">${w.levels.map((l, i) => (trial ? timedCard(l, i) : card(l, i, w.levels))).join('')}</div>`;
   };
   const go = (to: number) => {
     if (to < 0 || to >= worlds.length || to === k) return;
@@ -109,7 +129,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
   if (start.sheet) openSheet();
 
   return new Promise((resolve) => {
-    const finish = (v: number | null) => {
+    const finish = (v: { index: number; timed: boolean } | null) => {
       removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('pointerup', onUp);
@@ -157,7 +177,10 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       else if (btn.dataset.step) go(k + Number(btn.dataset.step));
       else if (btn.dataset.open !== undefined) openSheet();
       else if (btn.dataset.close !== undefined) sheet.classList.add('hidden');
-      else if (btn.dataset.i !== undefined) finish(Number(btn.dataset.i));
+      else if (btn.dataset.mode) {
+        timed = btn.dataset.mode === 'time';
+        render();
+      } else if (btn.dataset.i !== undefined) finish({ index: Number(btn.dataset.i), timed: worlds[k].trial && timed });
     };
     document.body.append(el);
   });

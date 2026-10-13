@@ -212,3 +212,54 @@
     animation: none;
   }
 }
+
+/* Moves / Time switch on a cleared world's sheet. */
+.seg {
+  display: flex;
+  gap: 2px;
+  margin: 0 10px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(20, 40, 80, 0.08);
+}
+
+.seg button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  font: 700 13px var(--font-ui);
+  color: var(--ink-soft);
+}
+
+.seg button.on {
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 2px 8px rgba(20, 40, 80, 0.14);
+}
+
+/* Time Trial cards: the medal won (or a clock), the best time. */
+.level-card.timed .level-medal {
+  display: grid;
+  place-items: start;
+  margin: 4px 0;
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 0.7;
+}
+
+.level-card.timed.medal-bronze .level-medal {
+  color: #c27a3e;
+  opacity: 1;
+}
+
+.level-card.timed.medal-silver .level-medal {
+  color: #8f9db0;
+  opacity: 1;
+}
+
+.level-card.timed.medal-gold .level-medal {
+  color: #e8a913;
+  opacity: 1;
+  filter: drop-shadow(0 2px 6px rgba(232, 169, 19, 0.5));
+}

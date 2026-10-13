@@ -10,6 +10,9 @@ export interface LevelProgress {
   clean?: boolean;
   /** The moves of the best solve (LURD), for the ghost and replays. */
   run?: string;
+  /** Time Trial: the best time (ms) and that run's moves with when each was made (ms). */
+  time?: number;
+  timeRun?: { moves: string; at: number[] };
 }
 
 export type Progress = Record<string, LevelProgress>;
@@ -34,6 +37,16 @@ export function saveResult(id: string, stars: number, moves: number, clean: bool
   };
   writeJSON(KEYS.progress, all);
   return better;
+}
+
+/** Keeps a Time Trial time if it's the best; returns true for a new best. */
+export function saveTime(id: string, ms: number, moves: string, at: number[]): boolean {
+  const all = loadProgress();
+  const old = all[id];
+  if (!old || (old.time !== undefined && old.time <= ms)) return false;
+  all[id] = { ...old, time: ms, timeRun: { moves, at } };
+  writeJSON(KEYS.progress, all);
+  return true;
 }
 
 const starsOf = (p: Progress, id: string) => p[id]?.stars ?? 0;

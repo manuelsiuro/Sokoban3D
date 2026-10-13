@@ -10,6 +10,7 @@ import { Coach } from './coach';
 import { levelText, t, type Key } from '../i18n';
 import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
+import { formatTime } from '../game/score';
 import { TOUCH, h, setText } from '../ui/dom';
 import { icon } from '../ui/icons';
 
@@ -24,7 +25,7 @@ const hud = h(
   `<div class="hud-top">
      <button class="icon-btn" data-a="back" data-l="hud.back">${icon('chevronLeft')}</button>
      <div class="hud-title"><small></small><b></b></div>
-     <span class="pill big hud-moves"><b>0</b>&nbsp;<small>/ par 0</small></span>
+     <span class="hud-pills"><span class="pill big hud-moves"><b>0</b>&nbsp;<small>/ par 0</small></span><span class="pill big hud-timer gone">${icon('clock', 16)}<b>0.0</b><i class="hud-pen"></i></span></span>
    </div>
    <div class="hud-bar">
      <button class="icon-btn" data-a="undo" data-l="hud.undo">${icon('undo')}</button>
@@ -76,6 +77,8 @@ interface Run {
   clean: boolean;
   /** Solved: input is closed while the summary comes. */
   over: boolean;
+  /** Time Trial: the clock starts on the first move (-1 before), undo adds penalties (ms), each frame's time. */
+  timed?: { start: number; penalty: number; at: number[]; final: number; ghost: { steps: GhostStep[]; at: number[] } | null };
   /** Expedition compasses left (undefined: no skipping here); `giveUp`: pressed once with none. */
   skip?: number;
   giveUp?: boolean;
@@ -88,6 +91,9 @@ export interface RunResult {
   moves: string;
   /** Left with the Skip button (Expedition), not solved. */
   skipped?: boolean;
+  /** Time Trial: the time (ms, penalties in) and when each move of `moves` was made. */
+  time?: number;
+  at?: number[];
 }
 let run: Run | null = null;
 
@@ -95,7 +101,7 @@ let run: Run | null = null;
  * Plays a level until it's solved; resolves with the final state (null if the player left).
  * `ghost`: a recorded run to show as a ghost; `autoplay`: a run to replay by itself.
  */
-export function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: string; autoplay?: string; skip?: number } = {}): Promise<RunResult | null> {
+export function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: string; autoplay?: string; skip?: number; timed?: { ghost?: { moves: string; at: number[] } } } = {}): Promise<RunResult | null> {
   showLevel(level);
   screen.mode = 'level';
   view.idle = false;
@@ -115,6 +121,14 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
     document.body.classList.add('is-playing');
     run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip };
     $('.hud-skip').classList.toggle('gone', opts.skip === undefined);
+    $('.hud-timer').classList.toggle('gone', !opts.timed);
+    if (opts.timed) {
+      const tg = opts.timed.ghost;
+      const steps = settings.ghost && tg && runSolves(level, tg.moves) ? ghostPath(level, tg.moves) : null;
+      run.timed = { start: -1, penalty: 0, at: [0], final: 0, ghost: steps && tg ? { steps, at: tg.at } : null };
+      run.ghost = null;
+      tick(run);
+    }
     $('.hud-grab').classList.toggle('gone', !screen.sim.grid.pull || !!opts.autoplay);
     setGrab(false);
     setText($('.hud-count'), String(opts.skip ?? ''));
@@ -137,6 +151,23 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   });
 }
 
+/** The Time Trial clock: elapsed ms with penalties (0 before the first move). */
+const elapsed = (r: Run) => (!r.timed || r.timed.start < 0 ? 0 : (r.over ? r.timed.final : performance.now() - r.timed.start + r.timed.penalty));
+
+/** Each frame of a Time Trial: the clock, and the best time's ghost where it was at this time. */
+function tick(r: Run) {
+  if (run !== r || !r.timed) return;
+  const ms = elapsed(r);
+  setText($('.hud-timer b'), formatTime(ms));
+  const g = r.timed.ghost;
+  if (g) {
+    let k = 0;
+    while (k < g.at.length && g.at[k] <= ms && r.timed.start >= 0) k++;
+    view.setGhost(g.steps[Math.min(k, g.steps.length - 1)]);
+  }
+  requestAnimationFrame(() => tick(r));
+}
+
 function endRun(state: GameState | null, skipped = false) {
   const r = run;
   if (!r) return;
@@ -146,12 +177,19 @@ function endRun(state: GameState | null, skipped = false) {
   document.body.classList.remove('is-playing');
   run = null;
   hud.classList.add('hidden');
-  r.done(state ? { state, clean: r.clean, moves: screen.sim.moves, skipped } : null);
+  const timed = r.timed && state ? { time: r.timed.final, at: r.timed.at.slice(1, screen.sim.frame + 1) } : {};
+  r.done(state ? { state, clean: r.clean, moves: screen.sim.moves, skipped, ...timed } : null);
 }
 
 /** Shows the sim's current state, animated from the one on screen, with its sounds. */
 function present(prev: GameState, forward: boolean) {
   const s = screen.sim.state;
+  // Time Trial: the clock starts with the first move; each frame keeps the time it was reached.
+  const tm = run?.timed;
+  if (tm && forward) {
+    if (tm.start < 0) tm.start = performance.now();
+    tm.at[screen.sim.frame] = Math.round(performance.now() - tm.start + tm.penalty);
+  }
   if (view.animating) view.finish();
   view.show(s, prev);
   screen.shown = s;
@@ -191,6 +229,7 @@ function present(prev: GameState, forward: boolean) {
   updateHud();
   if (s.moves >= 3 && s.moves < 4 && !tip.classList.contains('coach')) tip.classList.add('gone');
   if (forward && s.events & EVENT.win && run) {
+    if (run.timed) run.timed.final = run.timed.at[screen.sim.frame];
     run.over = true;
     sound.win();
     buzz('win');
@@ -305,10 +344,20 @@ function act(a: string) {
   if (a === 'undo' && screen.sim.undo()) {
     coach.on('undo');
     run.clean = false;
+    // Time Trial: undo costs two seconds.
+    if (run.timed && run.timed.start >= 0) {
+      run.timed.penalty += 2000;
+      const pen = $('.hud-pen');
+      pen.textContent = '+2';
+      pen.classList.remove('show');
+      void pen.offsetWidth;
+      pen.classList.add('show');
+    }
     present(prev, false);
   } else if (a === 'redo' && screen.sim.redo()) present(prev, true);
   else if (a === 'restart' && screen.sim.frame > 0) {
     run.clean = false;
+    if (run.timed) Object.assign(run.timed, { start: -1, penalty: 0, at: [0] });
     screen.sim.restart();
     screen.shown = screen.sim.state;
     view.show(screen.shown, null);

@@ -1,0 +1,5 @@
+par  3  gold 2.9  silver 4.4  bronze 6.5  medals 322110
+par 12  gold 5.8  silver 8.7  bronze 12.8  medals 322110
+par 40  gold 14.8  silver 22.2  bronze 32.5  medals 322110
+par 90  gold 30.8  silver 46.2  bronze 1:07.7  medals 322110
+times 0.0 0.9 12.3 1:01.0 12:34.3

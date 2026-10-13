@@ -20,12 +20,14 @@ export interface SummaryInfo {
   share?: () => Promise<string>;
   /** Offer to watch the best run. */
   watch?: boolean;
+  /** Time Trial: the time shown first, the medal's name, the next medal's time (stars are the medal). */
+  time?: { text: string; medal: string; next: string; gold: boolean };
 }
 
 /** A solved level: stars, moves against par, and what to do next. */
 /** `star(k)` plays as the k-th earned star lands (its animation). */
 export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number) => void): Promise<SummaryChoice> {
-  const hint = r.stars < 3 ? t('summary.forThree', { n: r.limits[1] }) : r.moves <= r.par ? t('summary.matched') : t('summary.three');
+  const hint = r.time ? r.time.next : r.stars < 3 ? t('summary.forThree', { n: r.limits[1] }) : r.moves <= r.par ? t('summary.matched') : t('summary.three');
   const notes = [r.par ? hint : '', r.best ? t('summary.newBest') : '', r.clean ? t('summary.noUndo') : ''].filter(Boolean);
   const stat = (label: string, value: number | string, cls = '') => `<span class="stat ${cls}"><b>${value}</b><small>${label}</small></span>`;
   const el = h(
@@ -33,11 +35,12 @@ export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number
     'modal',
     `<div class="card summary-card">
       <div class="summary-burst" aria-hidden="true"></div>
-      <h2>${t('summary.solved')}</h2>
+      <h2>${r.time ? r.time.medal : t('summary.solved')}</h2>
       <div class="summary-stars" aria-label="${t('summary.starsOf', { n: r.stars })}">${[0, 1, 2].map((k) => `<i class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.15}s">${icon('star', k === 1 ? 54 : 42)}</i>`).join('')}</div>
       <div class="summary-stats">
+        ${r.time ? stat(t('trial.timeLabel'), r.time.text, r.time.gold ? 'par-hit' : '') : ''}
         ${stat(t('summary.moves'), r.moves, r.par && r.moves <= r.par ? 'par-hit' : '')}
-        ${stat(t('summary.pushes'), r.pushes)}
+        ${r.time ? '' : stat(t('summary.pushes'), r.pushes)}
         ${r.par ? stat(t('summary.par'), r.par) : ''}
       </div>
       ${notes.length ? `<p class="summary-notes">${notes.map((n) => `<span>${n}</span>`).join('')}</p>` : ''}
