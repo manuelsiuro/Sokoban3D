@@ -65,7 +65,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
         <div class="menu-pair">
           <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
             <span class="menu-ic">${icon('star', 18)}</span>
-            <span class="menu-text"><span class="menu-label">${t('title.daily')}</span><small>${info.daily.stars ? t('title.dailySolved', { stars: '★'.repeat(info.daily.stars) }) : t('title.dailyNew')}${info.daily.streak ? t('title.streak', { n: info.daily.streak }) : ''}</small></span>
+            <span class="menu-text"><span class="menu-label">${t('title.daily')}</span><small>${info.daily.stars ? t('title.dailySolved', { stars: '★'.repeat(info.daily.stars) }) : info.daily.streak ? t('title.dailyStreak', { n: info.daily.streak }) : t('title.dailyShort')}</small></span>
             <i class="menu-bar"></i>
           </button>
           <button class="menu-btn ${info.expedition.open ? '' : 'locked'}" data-c="expedition" style="--tone:#2fb8a8;--tone-2:#1f8a80;--done:0%" ${info.expedition.open ? '' : 'disabled'}>

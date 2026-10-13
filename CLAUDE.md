@@ -15,5 +15,8 @@ Rules that matter every time:
 - **UI**: screens are functions returning a Promise; check desktop, 412×915 and 915×412.
 - **Browser tests in an isolated browser context**, so the player's saves are never touched.
   Another project's dev server may hold port 5199; use another port.
-- **Release**: build + tests green → commit → `npm version patch|minor` (local only for now;
-  no remote yet).
+- **Release**: build + tests green → commit → `npm version patch|minor` →
+  `git push --follow-tags origin main` (Actions deploys Pages) → poll the live bundle.
+- **Modes** live in `src/modes/` and play through `play()` in `run.ts`; shared objects come
+  from `src/app/context.ts`. **Text** goes through `t()` (`src/i18n/`, English and French;
+  `i18ntest` checks French covers every key). Grand Islands: `scripts/dev/buildgrand.ts`.

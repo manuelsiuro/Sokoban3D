@@ -12,9 +12,7 @@ export const en = {
   "title.worlds": "Worlds",
   "title.worldsSub": "{open}/{worlds} open · {solved}/{levels} solved",
   "title.daily": "Daily puzzle",
-  "title.dailySolved": "Solved today · {stars}",
-  "title.dailyNew": "A new puzzle every day",
-  "title.streak": " · {n}-day streak",
+  "title.dailySolved": "Solved · {stars}",
   "title.workshop": "Workshop",
   "title.workshopSub": "Build and share",
   "title.trophies": "Trophies",
@@ -337,6 +335,8 @@ export const en = {
   "trophy.tour.desc": "Solve every Grand Island.",
   "skin.marble": "Marble",
   "grand.matched": "Matched the best known!",
+  "title.dailyShort": "New every day",
+  "title.dailyStreak": "{n}-day streak",
 } as const;
 
 export type Strings = { [K in keyof typeof en]: string };

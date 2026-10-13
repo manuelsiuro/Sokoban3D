@@ -5,7 +5,7 @@ world built around a new mechanic. The 3D is in the rules as well as the looks: 
 heights (climb one step, crates fall off ledges, a crate in a dip becomes floor).
 
 Decisions (2026-10-12): all seven biomes; low-poly toy diorama look; original levels only,
-every one proven by the solver; local git only for now (no deploy yet).
+every one proven by the solver. Deployed on GitHub Pages (Actions) since v0.10.
 
 ## Rules (the simulation, `src/sim/`)
 
@@ -77,3 +77,10 @@ it with earlier ones, the last one is a showpiece.
 - Phase 4: hints, daily puzzle with streaks, workshop with share links, trophies and
   cosmetics, generated music, settings.
 - v0.10: ghost of the best run, replays (Watch best); GitHub remote and Pages deploy.
+- v0.11: installable PWA with update banner; v0.11.2 fixed a blank page after updates.
+- v0.12: visual pass (clouds, atmospheres, models) and polished screens.
+- 2026-10-13 AAA pass (plan: game feel, graphics, audio, access, four modes):
+  v0.13 game feel and camera, v0.14 graphics FX with quality tiers, v0.15 audio and
+  haptics, v0.16 tap-to-move, gamepads, color symbols, tutorial, v0.17 French, v0.18
+  Expedition, v0.19 Mirror Grove (pull rules), v0.20 Time Trial, v0.21 Grand Islands.
+- Not checked: a real phone (feel, frame rate on its GPU), audio by ear, vibration.

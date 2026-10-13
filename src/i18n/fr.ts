@@ -14,9 +14,7 @@ export const fr: Partial<Strings> = {
   "title.worlds": "Mondes",
   "title.worldsSub": "{open}/{worlds} ouverts · {solved}/{levels} résolus",
   "title.daily": "Défi du jour",
-  "title.dailySolved": "Résolu aujourd’hui · {stars}",
-  "title.dailyNew": "Un nouveau défi chaque jour",
-  "title.streak": " · série de {n} jours",
+  "title.dailySolved": "Résolu · {stars}",
   "title.workshop": "Atelier",
   "title.workshopSub": "Crée et partage",
   "title.trophies": "Trophées",
@@ -339,4 +337,6 @@ export const fr: Partial<Strings> = {
   "trophy.tour.desc": "Résous toutes les grandes îles.",
   "skin.marble": "Marbre",
   "grand.matched": "Égal au meilleur connu !",
+  "title.dailyShort": "Chaque jour",
+  "title.dailyStreak": "Série de {n} j",
 };

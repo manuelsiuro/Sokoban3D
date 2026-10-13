@@ -215,11 +215,13 @@ input:focus-visible + .switch {
 .swatch span {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.15;
+  text-align: center;
+  /* Long names wrap onto a second line rather than being cut. */
+  overflow-wrap: anywhere;
 }
 
 .swatch i {
