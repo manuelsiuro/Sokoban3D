@@ -62,6 +62,12 @@ export class View {
   /** The pusher's orientation at the start and end of its move (planets). */
   private pqFrom = new THREE.Quaternion();
   private pqTo = new THREE.Quaternion();
+  private lookOn = false;
+  private lookMix = 0;
+  private lookDir = new THREE.Vector3(0, 1, 0);
+  private lookUp = new THREE.Vector3(0, 0, -1);
+  private lookSide = new THREE.Vector3();
+  private lookDist = 10;
   overview = false;
   /** Raises the picture by this fraction of the screen's height (a sheet covers the bottom: the Planets list). */
   raise = 0;
@@ -472,6 +478,8 @@ export class View {
     this.big = Math.max(grid.w, grid.h) > 12;
     this.overview = false;
     this.raise = 0;
+    this.lookOn = false;
+    this.lookMix = 0;
     this.aim.copy(this.center);
     this.aimSpan = { radius: this.radius, half: this.halfSpan };
     // Shadows cover the island.
@@ -1119,18 +1127,72 @@ export class View {
     }
     // Aim at the pusher, seen from behind and above: its face, and the curve over to the next.
     const ground = this.aim.copy(n).multiplyScalar(this.overview ? 0 : planet.radius);
-    this.camera.position.copy(ground).addScaledVector(n, Math.sin(pitch) * dist).addScaledVector(f, -Math.cos(pitch) * dist);
+    const pos = this.camera.position.copy(ground).addScaledVector(n, Math.sin(pitch) * dist).addScaledVector(f, -Math.cos(pitch) * dist);
     // Look a little ahead.
     const look = ground.addScaledVector(f, 0.6);
-    this.camera.up.copy(f);
+    const camUp = this.camera.up.copy(f);
+    // Looking around: the camera orbits the planet where the player turned it, and glides back after.
+    this.lookMix += ((this.lookOn ? 1 : 0) - this.lookMix) * (this.reducedMotion ? 1 : Math.min(1, dt * 5));
+    if (this.lookMix < 1e-3) this.lookMix = 0;
+    if (this.lookMix > 0) {
+      const m = this.lookMix * this.lookMix * (3 - 2 * this.lookMix);
+      const r = pos.length() + (this.lookDist - pos.length()) * m;
+      pos.normalize().lerp(this.lookDir, m).normalize().multiplyScalar(r);
+      camUp.lerp(this.lookUp, m).normalize();
+      look.multiplyScalar(1 - m);
+    }
     this.camera.lookAt(look);
-    // The sun follows the camera, a little to one side, so the face in play is lit.
-    const side = this.tmp.copy(f).cross(n);
-    this.sun.position.copy(n).multiplyScalar(14).addScaledVector(f, -4).addScaledVector(side, 6);
+    // The sun follows the camera, a little above and to one side, so the face in view is lit.
+    const toward = this.tmp.copy(pos).normalize();
+    const side = this.lookSide.crossVectors(camUp, toward).normalize();
+    this.sun.position.copy(toward).multiplyScalar(14).addScaledVector(camUp, 4).addScaledVector(side, -6);
     this.sun.target.position.set(0, 0, 0);
-    this.fog.near = dist * 0.9;
-    this.fog.far = dist + 50;
+    this.fog.near = Math.max(1, pos.length() - planet.radius * 0.4);
+    this.fog.far = this.fog.near + 50;
     this.shakeCamera(dt);
+  }
+
+  /** Free look on a planet: on, the camera can be spun round the planet (`spin`, `zoom`); off, it glides back behind the pusher. */
+  get looking() {
+    return this.lookOn;
+  }
+  set looking(on: boolean) {
+    if (!this.planet || on === this.lookOn) return;
+    if (on) {
+      // Start from where the camera is, a little further out.
+      this.lookDir.copy(this.camera.position).normalize();
+      this.lookUp.copy(this.camera.up).addScaledVector(this.lookDir, -this.camera.up.dot(this.lookDir)).normalize();
+      this.lookDist = this.clampLook(this.camera.position.length() * 1.15);
+    }
+    this.lookOn = on;
+  }
+
+  /** Spins the planet under the camera by a drag of (dx, dy) pixels (turning free look on). */
+  spin(dx: number, dy: number) {
+    if (!this.planet) return;
+    this.looking = true;
+    const k = 0.006;
+    const right = this.lookSide.crossVectors(this.lookUp, this.lookDir).normalize();
+    // Drag right: the planet turns right, so the camera goes round to the left; drag down: it rises over the top.
+    this.lookDir.applyAxisAngle(this.lookUp, -dx * k);
+    right.applyAxisAngle(this.lookUp, -dx * k);
+    this.lookDir.applyAxisAngle(right, -dy * k);
+    this.lookUp.applyAxisAngle(right, -dy * k);
+    this.lookDir.normalize();
+    this.lookUp.addScaledVector(this.lookDir, -this.lookUp.dot(this.lookDir)).normalize();
+  }
+
+  /** Moves the free-look camera in (f < 1) or out (f > 1). */
+  zoom(f: number) {
+    if (!this.planet) return;
+    this.looking = true;
+    this.lookDist = this.clampLook(this.lookDist * f);
+  }
+
+  private clampLook(d: number) {
+    const r = this.planet ? this.planet.radius : 1;
+    const tan = Math.tan((this.camera.fov * Math.PI) / 360);
+    return Math.max(r * 2.2, Math.min((r * 3) / tan / Math.min(1, this.camera.aspect), d));
   }
 
   private shakeCamera(dt: number) {
