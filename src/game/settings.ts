@@ -1,4 +1,5 @@
 import { KEYS, PROGRESS_KEYS, readJSON, removeKey, writeJSON } from './storage';
+import type { Quality } from '../render/post';
 
 /** Player preferences, saved on this device. New fields get their default automatically. */
 export interface Settings {
@@ -18,6 +19,8 @@ export interface Settings {
   ghost: boolean;
   /** The camera shakes on falls and lava. */
   shake: boolean;
+  /** Render quality: auto adapts to the device. */
+  quality: Quality;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -30,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outfit: 'red',
   ghost: true,
   shake: true,
+  quality: 'auto',
 };
 
 export function loadSettings(): Settings {

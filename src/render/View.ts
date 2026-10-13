@@ -7,6 +7,8 @@ import { rng } from '../sim/rng';
 import { biomeOf, type Biome } from '../world/biomes';
 import { Atmosphere } from './atmosphere';
 import { Particles } from './particles';
+import { Post, type Quality } from './post';
+import { clock, iceShader, lavaShader } from './shaders';
 import { bake, plain, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 import { CRATE_COLORS, Mechanics, dressCrate, tileColor } from './mechanics';
@@ -82,6 +84,7 @@ export class View {
   /** Behind the title screen: the camera orbits slowly. */
   private orbiting = false;
   reducedMotion = false;
+  private post: Post;
 
   constructor(readonly renderer: THREE.WebGLRenderer) {
     renderer.shadowMap.enabled = true;
@@ -97,6 +100,19 @@ export class View {
     this.sun.shadow.normalBias = 0.02;
     this.root.add(this.world, this.player.group);
     this.scene.add(this.hemi, this.sun, this.sun.target, this.root);
+    this.addXray();
+    this.post = new Post(renderer, this.scene, this.camera);
+    this.post.onTier = (t) => {
+      // Lower tiers draw fewer pixels and smaller shadows.
+      renderer.setPixelRatio(Math.min(devicePixelRatio, t === 'high' ? 2 : t === 'medium' ? 1.5 : 1));
+      const size = t === 'high' ? 2048 : 1024;
+      if (this.sun.shadow.mapSize.x !== size) {
+        this.sun.shadow.mapSize.set(size, size);
+        this.sun.shadow.map?.dispose();
+        this.sun.shadow.map = null;
+      }
+      this.resize();
+    };
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -105,6 +121,30 @@ export class View {
     this.renderer.setSize(innerWidth, innerHeight);
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
+    this.post?.resize();
+  }
+
+  /** The render quality (see post.ts); touch screens start lower on auto. */
+  setQuality(q: Quality, touch: boolean) {
+    this.post.setQuality(q, touch);
+  }
+
+  get qualityTier() {
+    return this.post.current;
+  }
+
+  /**
+   * The pusher seen through walls: a slightly bigger shell drawn only where something is in
+   * front of it (depth test reversed), so it's never lost behind a wall after a turn.
+   */
+  private addXray() {
+    const shell = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.26, 0.42, 4, 12),
+      new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.45, depthWrite: false, depthFunc: THREE.GreaterDepth }),
+    );
+    shell.position.y = 0.45;
+    shell.renderOrder = 5;
+    this.player.group.add(shell);
   }
 
   /** World position of a cell's floor (or of a crate/player standing at level z). */
@@ -175,7 +215,12 @@ export class View {
         const tile = tileGeometry.clone().translate(wx, top - 0.15, wz);
         if (look) {
           const k = `${look.color}`;
-          if (!special.has(k)) special.set(k, { geos: [], m: mat(look.color, look.opts) });
+          if (!special.has(k)) {
+          const m = mat(look.color, look.opts);
+          if (grid.tile[c] === TILE.lava) lavaShader(m);
+          if (grid.tile[c] === TILE.ice) iceShader(m);
+          special.set(k, { geos: [], m });
+        }
           special.get(k)!.geos.push(tile);
         } else if (z !== 0) {
           // Higher ground is lighter, dips darker, so the levels read at a glance.
@@ -673,7 +718,8 @@ export class View {
       for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
     }
     this.placeCamera(dt);
-    this.renderer.render(this.scene, this.camera);
+    clock.value = time;
+    this.post.render(this.scene, this.camera, time);
   }
 
   private placeCamera(dt: number) {

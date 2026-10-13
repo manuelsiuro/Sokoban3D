@@ -35,6 +35,7 @@ document.body.append(renderer.domElement);
 export const view = new View(renderer);
 view.reducedMotion = settings.reducedMotion;
 view.shake = settings.shake;
+view.setQuality(settings.quality, TOUCH);
 export const map = new MapView(renderer, WORLDS);
 addEventListener('resize', () => map.resize());
 map.resize();

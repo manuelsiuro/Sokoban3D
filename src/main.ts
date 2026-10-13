@@ -10,6 +10,7 @@ import { currentStreak, loadDaily } from './game/dailyProgress';
 import { decodeLevel } from './game/share';
 import { isWorldOpen, loadProgress, nextLevel, totalStars, worldLevels } from './game/progress';
 import { showTitle } from './ui/screens/title';
+import { TOUCH } from './ui/dom';
 import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
 import { showUpdate } from './ui/screens/update';
@@ -28,6 +29,8 @@ import { workshopFlow } from './modes/workshop';
  */
 showLevel(LEVELS[nextLevel() ?? 0]);
 applyLook();
+/** The quality the view runs at (changing any other setting leaves the auto tier alone). */
+let shownQuality = settings.quality;
 
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -95,12 +98,14 @@ async function titleFlow() {
           applySound();
           view.reducedMotion = s.reducedMotion;
           view.shake = s.shake;
+          if (s.quality !== shownQuality) view.setQuality((shownQuality = s.quality), TOUCH);
         },
         reset: () => resetProgress(),
         install: installKind(),
         promptInstall,
         installHelp: () => showInstallHelp(click),
         click,
+        tier: settings.quality === 'auto' ? view.qualityTier : undefined,
       });
   }
 }

@@ -5,7 +5,7 @@ import { icon } from '../icons';
 /** Settings: sound, music, motion, and resetting progress (two presses, no browser dialog). */
 export function showSettings(
   s: Settings,
-  hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void },
+  hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void; tier?: string },
 ): Promise<void> {
   const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
@@ -27,6 +27,10 @@ export function showSettings(
         ${row('shake', 'Screen shake', s.shake)}
         ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}
       </div>
+      <h3 class="set-group">${icon('star', 15)} Graphics</h3>
+      <div class="set-list">
+        <label class="set-row"><span>Quality${hooks.tier ? ` <small class="set-note">now: ${hooks.tier}</small>` : ''}</span><select data-k="quality">${(['auto', 'high', 'medium', 'low'] as const).map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${q[0].toUpperCase() + q.slice(1)}</option>`).join('')}</select></label>
+      </div>
       ${hooks.install === 'prompt' ? `<button class="big-btn ghost" data-install>${icon('download', 16)} Install the app</button>` : ''}
       ${hooks.install === 'ios' ? `<button class="big-btn ghost" data-install-help>${icon('download', 16)} Install the app</button>` : ''}
       <button class="big-btn ghost danger" data-reset>${icon('replay', 16)} Reset progress</button>
@@ -38,7 +42,8 @@ export function showSettings(
       const t = e.target as HTMLInputElement;
       const k = t.dataset.k as keyof Settings | undefined;
       if (!k) return;
-      if (k === 'muted') s.muted = !t.checked;
+      if (k === 'quality') s.quality = t.value as Settings['quality'];
+      else if (k === 'muted') s.muted = !t.checked;
       else if (t.type === 'checkbox') (s as unknown as Record<string, boolean>)[k] = t.checked;
       else (s as unknown as Record<string, number>)[k] = Number(t.value);
       hooks.change(s);

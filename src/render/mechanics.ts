@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { DX, DY, KIND, TILE, type Grid } from '../sim/grid';
 import type { GameState } from '../sim/Sim';
 import { mat } from './models';
+import { lavaShader, swirlShader } from './shaders';
 
 /**
  * The models for the biome mechanics, and how the state moves them: plates sink, doors
@@ -144,7 +145,7 @@ export class Mechanics {
         // A hexagonal metal pad with a glowing core (goals are rings; pads are filled).
         const ring = new THREE.Group();
         const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.06, 6), mat(0x5a5f6b, { metal: 0.6, rough: 0.35 }));
-        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.07, 6), mat(color, { emissive: color, emissiveIntensity: 1.1, rough: 0.3 }));
+        const core = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.07, 6), swirlShader(mat(color, { emissive: color, emissiveIntensity: 1.1, rough: 0.3 })));
         core.position.y = 0.01;
         ring.add(pad, core);
         ring.position.copy(at).add(new THREE.Vector3(0, 0.03, 0));
@@ -181,7 +182,7 @@ export class Mechanics {
         this.receivers.set(c, gem);
         this.group.add(shadowed(o));
       } else if (t === TILE.lava) {
-        if (!this.lava) this.lava = mat(0xff6a1a, { rough: 0.5, emissive: 0xff4a10, emissiveIntensity: 1.2 });
+        if (!this.lava) this.lava = lavaShader(mat(0xff6a1a, { rough: 0.5, emissive: 0xff4a10, emissiveIntensity: 1.2 }));
         const crustMat = mat(0x3a2a2a, { rough: 0.9, flat: true, emissive: 0x401000, emissiveIntensity: 0.4 });
         for (let k = 0; k < 2; k++) {
           const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.13 + ((c * 7 + k * 3) % 5) * 0.02, 0), crustMat);
