@@ -58,6 +58,7 @@ export class View {
   private facing = 0;
   private facingFrom = 0;
   private pushing = false;
+  private pulling = false;
   private t0 = 0;
   private dur = MOVE_T;
   private now = 0;
@@ -416,6 +417,7 @@ export class View {
     this.facing = (6 - s.facing) % 4;
     if (!animate) this.facingFrom = this.facing;
     this.pushing = (s.events & EVENT.push) !== 0 && prev !== null && s.moves > prev.moves;
+    this.pulling = (s.events & EVENT.pull) !== 0 && prev !== null && s.moves > prev.moves;
     // Feedback.
     if (animate && prev && s.moves > prev.moves) {
       this.introAt = -1;
@@ -665,7 +667,8 @@ export class View {
     df = ((((df + 2) % 4) + 4) % 4) - 2;
     p.group.rotation.y = (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2);
     // Lean into a push; a little bob while idle; a happy spin once solved.
-    p.body.rotation.x = this.pushing && t < 1 ? 0.25 * Math.sin(Math.PI * t) : 0;
+    // Lean into a push, lean back hauling a pull.
+    p.body.rotation.x = (this.pushing ? 0.25 : this.pulling ? -0.3 : 0) * (t < 1 ? Math.sin(Math.PI * t) : 0);
     p.body.position.y = Math.max(0, Math.sin(time * 3) * 0.015);
     if (this.wonAt >= 0) {
       const w = time - this.wonAt;

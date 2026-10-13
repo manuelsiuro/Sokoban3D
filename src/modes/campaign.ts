@@ -2,7 +2,7 @@ import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
 import type { LevelDef } from '../levels/types';
 import { click, map, newTrophies, par, screen, settings, showLevel, sound, summary, view, worldIndex } from '../app/context';
-import { isUnlocked, isWorldOpen, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
+import { OPENS_AFTER, isUnlocked, isWorldOpen, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
 import { starLimits, starsFor } from '../game/score';
 import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
@@ -87,6 +87,7 @@ export async function worldsFlow(start: number) {
         maxStars: levels.length * 3,
         open: isWorldOpen(k, p),
         missing: Math.max(0, worldGate(k) - total),
+        opensAfter: OPENS_AFTER[w.id] ? WORLDS.find((x) => x.id === OPENS_AFTER[w.id])?.name : undefined,
         gate: worldGate(k),
         soon: levels.length === 0,
         levels: levels.map(({ l, i }) => ({ index: i, name: levelText(l).name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),

@@ -50,6 +50,10 @@ export function worldGate(index: number) {
   return Math.ceil(before * GATE);
 }
 
+/** Side worlds that open once another world is cleared (every level solved), not at a star gate. */
+export const OPENS_AFTER: Record<string, string> = { reverse: 'desert' };
+export const worldCleared = (world: string, p = loadProgress()) => worldLevels(world).every(({ l }) => starsOf(p, l.id) > 0);
+
 /**
  * A world opens at its star gate, and stays open once a level in it has a star (so a
  * changed gate never locks a world already played in). Worlds without levels stay shut.
@@ -58,6 +62,7 @@ export function isWorldOpen(index: number, p = loadProgress()) {
   const w = WORLDS[index];
   if (!w || worldLevels(w.id).length === 0) return false;
   if (index === 0 || worldStars(w.id, p) > 0) return true;
+  if (OPENS_AFTER[w.id]) return worldCleared(OPENS_AFTER[w.id], p);
   return totalStars(p) >= worldGate(index);
 }
 

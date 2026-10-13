@@ -4,7 +4,7 @@ import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
 import { buzz } from '../app/haptics';
 import { startGamepad } from '../app/gamepad';
-import { TILE } from '../sim/grid';
+import { DX, DY, TILE } from '../sim/grid';
 import { walkTo } from '../game/path';
 import { Coach } from './coach';
 import { levelText, t, type Key } from '../i18n';
@@ -30,6 +30,7 @@ const hud = h(
      <button class="icon-btn" data-a="undo" data-l="hud.undo">${icon('undo')}</button>
      <button class="icon-btn" data-a="restart" data-l="hud.restart">${icon('replay')}</button>
      <button class="icon-btn" data-a="hint" data-l="hud.hint">${icon('bulb')}</button>
+     <button class="icon-btn hud-grab gone" data-a="grab" data-l="hud.grab" aria-pressed="false">${icon('hand')}</button>
      <button class="icon-btn hud-skip gone" data-a="skip" data-l="hud.skip">${icon('compass')}<b class="hud-count"></b></button>
      <span class="sep"></span>
      <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
@@ -114,6 +115,8 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
     document.body.classList.add('is-playing');
     run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip };
     $('.hud-skip').classList.toggle('gone', opts.skip === undefined);
+    $('.hud-grab').classList.toggle('gone', !screen.sim.grid.pull || !!opts.autoplay);
+    setGrab(false);
     setText($('.hud-count'), String(opts.skip ?? ''));
     hud.classList.toggle('watching', !!opts.autoplay);
     if (opts.autoplay) {
@@ -157,7 +160,7 @@ function present(prev: GameState, forward: boolean) {
     if (e & EVENT.lost) sound.lost();
     else if (e & EVENT.fall) sound.fall();
     if (e & (EVENT.lost | EVENT.fall)) buzz('fall');
-    if (e & EVENT.push) {
+    if (e & (EVENT.push | EVENT.pull)) {
       sound.push();
       buzz('push');
     }
@@ -196,10 +199,23 @@ function present(prev: GameState, forward: boolean) {
   }
 }
 
-/** A move in a screen direction (0 up, 1 right, 2 down, 3 left). Stops a tapped walk. */
-function move(dir: number) {
+/** Pull levels: the Grab toggle (touch) is on; Shift does the same while held. */
+let grab = false;
+function setGrab(on: boolean) {
+  grab = on;
+  const b = $('.hud-grab');
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', String(on));
+}
+
+/**
+ * A move in a screen direction (0 up, 1 right, 2 down, 3 left). On pull levels, `pull` (or
+ * the Grab toggle) steps away dragging the crate behind. Stops a tapped walk.
+ */
+function move(dir: number, pull = false) {
   stopWalk();
-  moveGrid(view.screenDir(dir));
+  const pulling = screen.sim.grid.pull && (pull || grab);
+  moveGrid(view.screenDir(dir) + (pulling ? 4 : 0));
 }
 
 /** A move in a grid direction; false when blocked. */
@@ -230,7 +246,11 @@ function tapCell(cell: number) {
   const dx = (cell % g.w) - (at % g.w);
   const dy = Math.floor(cell / g.w) - Math.floor(at / g.w);
   if (Math.abs(dx) + Math.abs(dy) === 1) {
-    moveGrid(dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0);
+    const d = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+    // Pull levels: a step away from a crate right behind pulls it.
+    const behind = (at % g.w) - DX[d] + (Math.floor(at / g.w) - DY[d]) * g.w;
+    const pull = g.pull && screen.shown.crates.some((c) => c.cell === behind && c.z === screen.shown.z);
+    moveGrid(d + (pull ? 4 : 0));
     return;
   }
   if (cell === at) return;
@@ -263,6 +283,12 @@ function act(a: string) {
   if (run.over || run.watching) return;
   if (a === 'hint') {
     askHint();
+    return;
+  }
+  if (a === 'grab') {
+    click();
+    setGrab(!grab);
+    if (grab) say(t('hud.grabOn'), 3500);
     return;
   }
   if (a === 'skip' && run.skip !== undefined) {
@@ -316,7 +342,8 @@ async function askHint() {
     view.showHint(DIRS.indexOf(c.toLowerCase()));
     const n = answer.solution.length;
     const push = c === c.toUpperCase();
-    say(n === 1 ? t(push ? 'hud.hintPushOne' : 'hud.hintStepOne') : t(push ? 'hud.hintPush' : 'hud.hintStep', { n }));
+    if (push && screen.sim.grid.pull) say(n === 1 ? t('hint.pull1') : t('hint.pull', { n }));
+    else say(n === 1 ? t(push ? 'hud.hintPushOne' : 'hud.hintStepOne') : t(push ? 'hud.hintPush' : 'hud.hintStep', { n }));
   } else say(answer.complete ? t('hud.stuck') : t('hud.tooMany'));
 }
 
@@ -336,7 +363,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault();
     // Held keys repeat at the animation's pace.
     if (e.repeat && view.animating) return;
-    move(d);
+    move(d, e.shiftKey);
     return;
   }
   const a = ACTIONS[e.code];
@@ -398,4 +425,4 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 });
 renderer.domElement.addEventListener('pointercancel', () => (swipe = null));
 
-startGamepad({ playing: () => !!run, move, act });
+startGamepad({ playing: () => !!run, move: (d, pull) => move(d, pull), act });

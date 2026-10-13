@@ -22,6 +22,7 @@ const STEPS: Record<string, Step[]> = {
     { text: () => t('coach.push'), until: 'goal' },
   ],
   'meadow-2': [{ text: () => t('coach.undo', { key: TOUCH ? '↶' : 'Z' }), after: 2, until: 'undo', ms: 9000 }],
+  'reverse-1': [{ text: () => t(TOUCH ? 'coach.pullTouch' : 'coach.pullKeys'), until: 'move', ms: 12000 }],
   'meadow-3': [{ text: () => t('coach.hint', { key: t(TOUCH ? 'coach.bulb' : 'coach.bulbKey') }), ms: 8000 }],
 };
 

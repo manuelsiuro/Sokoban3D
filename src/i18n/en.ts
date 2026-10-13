@@ -292,6 +292,16 @@ export const en = {
   "outfit.navigator": "Navigator",
   "skin.abyss": "Abyss",
   "common.done": "Done",
+  "world.reverse.name": "Mirror Grove",
+  "world.reverse.mechanic": "Pull rules: crates follow you",
+  "worlds.opensAfter": "Opens when {world} is cleared",
+  "outfit.mirror": "Mirror",
+  "hud.grab": "Grab: pull crates (Shift)",
+  "hud.grabOn": "Grab is on: step away from a crate to pull it.",
+  "hint.pull": "Pull that way · {n} moves to go from here",
+  "hint.pull1": "Pull that way · 1 move to go from here",
+  "coach.pullKeys": "Hold Shift and step away from a crate to pull it.",
+  "coach.pullTouch": "Turn on the hand, then step away from a crate to pull it.",
 } as const;
 
 export type Strings = { [K in keyof typeof en]: string };

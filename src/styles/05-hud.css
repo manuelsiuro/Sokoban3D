@@ -291,3 +291,14 @@
   margin: 0 0 4px;
   line-height: 1.45;
 }
+
+/* Pull levels: the Grab toggle, lit while on. */
+.hud-grab.gone {
+  display: none;
+}
+
+.hud-grab.on {
+  color: white;
+  background: linear-gradient(180deg, #b48cff, #7a5fb0);
+  box-shadow: 0 6px 16px -6px rgba(122, 95, 176, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}

@@ -68,3 +68,13 @@ OK   clockwork-7    par  49 pushes  19 crates 3  ★★ ≤73 ★★★ ≤53
 OK   clockwork-8    par  41 pushes  14 crates 3  ★★ ≤61 ★★★ ≤45
 OK   clockwork-9    par  43 pushes  17 crates 3  ★★ ≤64 ★★★ ≤47
 OK   clockwork-10   par  76 pushes  23 crates 3  ★★ ≤114 ★★★ ≤83
+OK   reverse-1      par  12 pushes   5 crates 1  ★★ ≤18 ★★★ ≤13
+OK   reverse-2      par  15 pushes   7 crates 1  ★★ ≤22 ★★★ ≤16
+OK   reverse-3      par  13 pushes   6 crates 2  ★★ ≤19 ★★★ ≤14
+OK   reverse-4      par  22 pushes  11 crates 2  ★★ ≤33 ★★★ ≤24
+OK   reverse-5      par  26 pushes   9 crates 2  ★★ ≤39 ★★★ ≤28
+OK   reverse-6      par  25 pushes  11 crates 2  ★★ ≤37 ★★★ ≤27
+OK   reverse-7      par  46 pushes  14 crates 3  ★★ ≤69 ★★★ ≤50
+OK   reverse-8      par  49 pushes  15 crates 3  ★★ ≤73 ★★★ ≤53
+OK   reverse-9      par  43 pushes  12 crates 3  ★★ ≤64 ★★★ ≤47
+OK   reverse-10     par  64 pushes  24 crates 3  ★★ ≤96 ★★★ ≤70

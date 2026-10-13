@@ -1,1 +1,1 @@
-70 ghost paths, 2230 steps
+80 ghost paths, 2555 steps

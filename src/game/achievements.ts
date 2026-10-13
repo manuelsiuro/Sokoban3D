@@ -44,6 +44,7 @@ export const OUTFITS: Outfit[] = [
   { id: 'blue', get name() { return t('outfit.blue'); }, cap: 0x2f8fe0, suit: 0x1f3f6a },
   { id: 'purple', get name() { return t('outfit.purple'); }, cap: 0x8d5fd6, suit: 0x3a2a5a },
   { id: 'hardhat', get name() { return t('outfit.hardhat'); }, cap: 0xffc23d, suit: 0xe8763a },
+  { id: 'mirror', get name() { return t('outfit.mirror'); }, cap: 0xff8fd0, suit: 0x7a5fb0 },
   { id: 'navigator', get name() { return t('outfit.navigator'); }, cap: 0x2fb8a8, suit: 0xd9b27a },
 ];
 
@@ -74,6 +75,7 @@ const REWARD: Record<string, Achievement['reward']> = {
   forge: { skin: 'iron' },
   crystal: { skin: 'gem' },
   clockwork: { outfit: 'brass' },
+  reverse: { outfit: 'mirror' },
 };
 
 export const ACHIEVEMENTS: Achievement[] = [

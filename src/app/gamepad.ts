@@ -1,13 +1,14 @@
 /**
  * Gamepads (the standard mapping), polled each frame. In a level: d-pad or left stick to
- * move (held: repeats), B undo, X hint, Y restart, shoulders turn the camera, Start back.
+ * move (held: repeats; with A held, pull on pull levels), B undo, X hint, Y restart, shoulders turn the camera, Start back.
  * In menus: d-pad or stick moves the focus to the nearest button that way, A presses it,
  * B goes back.
  */
 export interface PadTarget {
   /** True while a level is being played. */
   playing: () => boolean;
-  move: (screenDir: number) => void;
+  /** `pull`: A is held (pull levels). */
+  move: (screenDir: number, pull: boolean) => void;
   act: (action: string) => void;
 }
 
@@ -79,7 +80,7 @@ export function startGamepad(t: PadTarget) {
       fire = true;
     }
     if (t.playing()) {
-      if (fire) t.move(dir);
+      if (fire) t.move(dir, pressed(BTN.a));
       if (down(BTN.b)) t.act('undo');
       if (down(BTN.x)) t.act('hint');
       if (down(BTN.y)) t.act('restart');

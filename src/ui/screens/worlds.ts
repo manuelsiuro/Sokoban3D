@@ -23,6 +23,8 @@ export interface WorldCard {
   open: boolean;
   /** Stars still needed to open it (0 when open). */
   missing: number;
+  /** A side world: opens when this world is cleared (instead of at a star gate). */
+  opensAfter?: string;
   /** The gate, for the lock banner's bar. */
   gate: number;
   /** No levels yet. */
@@ -76,7 +78,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
     const lock = w.soon
       ? `<p class="world-lock">${t('worlds.soon')}</p>`
       : !w.open
-        ? `<div class="world-lock">${icon('lock', 16)} <span>${w.missing === 1 ? t('worlds.missingOne') : t('worlds.missing', { n: w.missing })}</span><i style="--done:${((1 - w.missing / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>`
+        ? `<div class="world-lock">${icon('lock', 16)} <span>${w.opensAfter ? t('worlds.opensAfter', { world: w.opensAfter }) : w.missing === 1 ? t('worlds.missingOne') : t('worlds.missing', { n: w.missing })}</span><i style="--done:${((1 - w.missing / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>`
         : '';
     cardEl.innerHTML = `
       <button class="icon-btn world-prev" data-step="-1" aria-label="${t('worlds.prev')}" ${k === 0 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
