@@ -31,12 +31,15 @@ ok   a conveyor carries the player after the move
 ok   a conveyor carries a crate pushed onto it
 ok   a crate pushed onto a pad comes out of the other
 ok   nothing comes out of a pad that is taken
+ok   a crate never teleports onto the cell the player steps into
+ok   a conveyor carries the player onto a pad, and it teleports
 ok   a g gate is up at the start (even moves)
 ok   a G gate is down on even moves, up on odd ones, never on someone
 ok   ...and up after the player leaves it on an odd move
 ok   a mirror crate turns the beam onto the receiver
 ok   a plain crate blocks the beam
 ok   a colored goal wants its color
+ok   past 32767 moves the count steps back by one, keeping its parity
 ok   redo and replaying the same move keep the record
 ok   a different move after undo replaces the moves after it
 moves after replace: "rRRl"

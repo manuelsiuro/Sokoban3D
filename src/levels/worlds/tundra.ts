@@ -188,7 +188,7 @@ export const TUNDRA: LevelDef[] = [
     name: "Avalanche",
     world: W,
     difficulty: 4,
-    tip: "Three crates and a slippery floor. Turn the camera (Q/E) to read the ice.",
+    tip: "Three crates and a slippery floor. Turn the camera (↺ ↻) to read the ice.",
     map: [
       '#########',
       '#@      #',

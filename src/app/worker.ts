@@ -15,26 +15,19 @@ type Job = { id: number; type: 'hint'; level: LevelDef; raw: number[] } | { id: 
 /** The worker's own scope (typed here, so the DOM types of the rest of the app stay as they are). */
 const ctx = self as unknown as { postMessage: (m: unknown) => void; onmessage: ((e: MessageEvent<Job>) => void) | null };
 
-ctx.onmessage = (e) => {
-  const job = e.data;
-  if (job.type === 'hint') {
-    const r = solve(parseLevel(job.level), { start: Int16Array.from(job.raw), maxStates: 700_000 });
-    ctx.postMessage({ id: job.id, result: { solution: r.solution, complete: r.complete } });
-  } else if (job.type === 'floor') {
-    let result = null;
-    try {
-      result = expeditionFloor(job.seed, job.depth);
-    } catch {
-      /* none: the caller says so */
+/** Runs a job. One that throws answers with its failure value, which the callers read as "none". */
+function run(job: Job): unknown {
+  try {
+    if (job.type === 'hint') {
+      const r = solve(parseLevel(job.level), { start: Int16Array.from(job.raw), maxStates: 700_000 });
+      return { solution: r.solution, complete: r.complete };
     }
-    ctx.postMessage({ id: job.id, result });
-  } else {
-    let result = null;
-    try {
-      result = dailyPuzzle(job.date);
-    } catch {
-      /* no puzzle: the caller says so */
-    }
-    ctx.postMessage({ id: job.id, result });
+    return job.type === 'floor' ? expeditionFloor(job.seed, job.depth) : dailyPuzzle(job.date);
+  } catch {
+    return job.type === 'hint' ? { solution: null, complete: false } : null;
   }
+}
+
+ctx.onmessage = (e) => {
+  ctx.postMessage({ id: e.data.id, result: run(e.data) });
 };

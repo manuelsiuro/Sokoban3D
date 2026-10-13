@@ -71,3 +71,76 @@ export const swirlShader = (m: THREE.MeshStandardMaterial) =>
       totalEmissiveRadiance *= 0.55 + 0.9 * arms;
     }`,
   );
+
+let glowTex: THREE.Texture | null = null;
+/** A soft round glow (sprites, sparks, laser flares), shared. */
+export function glowTexture() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.6, 'rgba(255,255,255,0.18)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
+}
+
+let fadeTex: THREE.Texture | null = null;
+/** A vertical fade, bright at the bottom (v = 0) to nothing at the top: light columns. Shared. */
+export function fadeTexture() {
+  if (fadeTex) return fadeTex;
+  const c = document.createElement('canvas');
+  c.width = 2;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 64, 0, 0);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.3, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 64);
+  fadeTex = new THREE.CanvasTexture(c);
+  return fadeTex;
+}
+
+/** An additive, unlit glow material (columns, beam halos, sparks): never in the depth buffer. */
+export function glowMaterial(color: number, opacity: number, map: THREE.Texture | null = null) {
+  return new THREE.MeshBasicMaterial({ color, map, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, toneMapped: false });
+}
+
+/**
+ * A soft halo around a tube (laser beams): additive, brightest where the surface faces the
+ * camera and fading to nothing at its silhouette, so it reads as glow rather than a pipe.
+ */
+export function haloMaterial(color: number, opacity: number) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
+    vertexShader: `
+      varying vec3 vN;
+      varying vec3 vV;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec3 vN;
+      varying vec3 vV;
+      void main() {
+        float f = abs(dot(normalize(vN), normalize(vV)));
+        gl_FragColor = vec4(uColor, uOpacity * f * f);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+}

@@ -51,6 +51,9 @@ export interface Grid {
   receivers: number[];
   emitters: number[];
   conveyors: number[];
+  doors: number[];
+  /** Gate cells (both kinds). */
+  gateCells: number[];
   /** Gates exist: the move count's parity is part of the position. */
   gates: boolean;
   /** Every floor is at the same height and nothing but walls and goals is in the way. */
@@ -188,6 +191,7 @@ export function parseLevel(level: LevelDef): Grid {
     if (have < want) throw new Error(`${level.id}: ${have} crates of color ${c} for ${want} goals`);
   }
   if (crates.length < goals.length) throw new Error(`${level.id}: ${crates.length} crates for ${goals.length} goals`);
+  const gateCells = [...tile.keys()].filter((i) => tile[i] === TILE.gateEven || tile[i] === TILE.gateOdd);
   const heights = new Set<number>();
   for (let i = 0; i < n; i++) if (floor[i] !== VOID && !wall[i]) heights.add(floor[i]);
   return {
@@ -208,7 +212,9 @@ export function parseLevel(level: LevelDef): Grid {
     receivers,
     emitters: list(TILE.emitter),
     conveyors: list(TILE.conveyor),
-    gates: list(TILE.gateEven).length + list(TILE.gateOdd).length > 0,
+    doors: list(TILE.door),
+    gateCells,
+    gates: gateCells.length > 0,
     classic: !special && heights.size === 1 && !level.map.some((r) => r.includes(',')) && level.rules !== 'pull',
     pull: level.rules === 'pull',
   };

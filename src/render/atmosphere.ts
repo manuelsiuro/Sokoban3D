@@ -10,7 +10,7 @@ import { cloudGeometry, crystalGeometry, gearGeometry, roughen, spikeGeometry } 
  */
 export class Atmosphere {
   readonly group = new THREE.Group();
-  private clouds: { o: THREE.Object3D; speed: number }[] = [];
+  private clouds: { o: THREE.Mesh; speed: number; m: THREE.MeshStandardMaterial }[] = [];
   private spinners: { o: THREE.Object3D; speed: number }[] = [];
   private floaters: { o: THREE.Object3D; y: number; phase: number }[] = [];
   private motes: THREE.Points | null = null;
@@ -27,8 +27,11 @@ export class Atmosphere {
     this.span = Math.max(30, radius * 3 + 16);
     if (air.clouds) {
       const { top, belly, count } = air.clouds;
-      const m = mat(0xffffff, { rough: 1, vertexColors: true, emissive: top, emissiveIntensity: 0.32 });
+      const base = mat(0xffffff, { rough: 1, vertexColors: true, emissive: top, emissiveIntensity: 0.26 });
       for (let k = 0; k < count; k++) {
+        // Each cloud fades on its own when the camera comes close (see update).
+        const m = base.clone();
+        m.transparent = true;
         const big = 0.8 + r() * 1;
         const geo = cloudGeometry(r, { length: 3 * big, height: 1.1 * big, depth: 1.6 * big, puffs: 4 + Math.floor(r() * 3), top, belly });
         const c = new THREE.Mesh(geo, m);
@@ -40,7 +43,7 @@ export class Atmosphere {
         if (!low) c.scale.setScalar(1.8);
         c.rotation.y = r() * 0.6 - 0.3;
         this.group.add(c);
-        this.clouds.push({ o: c, speed: 0.12 + r() * 0.18 });
+        this.clouds.push({ o: c, speed: 0.12 + r() * 0.18, m });
       }
     }
     if (air.far === 'islands') {
@@ -127,11 +130,19 @@ export class Atmosphere {
     }
   }
 
-  update(time: number, dt: number) {
+  /** `eye`: the camera, so clouds drifting close to it fade instead of filling the screen. */
+  update(time: number, dt: number, eye?: THREE.Vector3) {
     const half = this.span;
     for (const c of this.clouds) {
       c.o.position.x += c.speed * dt;
       if (c.o.position.x > half) c.o.position.x = -half;
+      if (eye) {
+        c.o.getWorldPosition(at);
+        const d = at.distanceTo(eye) / Math.max(1, c.o.scale.x);
+        const o = Math.min(1, Math.max(0, (d - 7) / 6));
+        c.m.opacity = o;
+        c.o.visible = o > 0.01;
+      }
     }
     for (const s of this.spinners) s.o.rotation.y += s.speed * dt;
     for (const f of this.floaters) f.o.position.y = f.y + Math.sin(time * 0.5 + f.phase) * 0.3;
@@ -155,8 +166,12 @@ export class Atmosphere {
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points) o.geometry.dispose();
     });
+    for (const c of this.clouds) c.m.dispose();
+    (this.motes?.material as THREE.Material | undefined)?.dispose();
   }
 }
+
+const at = new THREE.Vector3();
 
 let dotTex: THREE.Texture | null = null;
 /** A soft round dot for the particles. */

@@ -46,7 +46,8 @@ export async function expeditionFlow(seed?: number) {
     const gained = stars >= 3 && run.compasses < 5;
     run = clearFloor(run, stars, s.moves, floor.par);
     const extra = [t('exp.points', { points, score: run.score }), gained ? `${icon('compass', 14)} ${t('exp.compass')}` : '', newTrophies()].filter(Boolean).join(' · ');
-    const choice = await summary({ stars, moves: s.moves, pushes: s.pushes, par: floor.par, limits: starLimits(floor.par), best: false, clean: r.clean, hasNext: true, extra });
+    // No retry here: the floor is already counted, the run goes on.
+    const choice = await summary({ stars, moves: s.moves, pushes: s.pushes, par: floor.par, limits: starLimits(floor.par), best: false, clean: r.clean, hasNext: true, noRetry: true, extra });
     if (choice !== 'next') return; // The run waits at the next floor.
     await view.leave();
   }
@@ -55,18 +56,20 @@ export async function expeditionFlow(seed?: number) {
 /** A run to play: the saved one, a new one, or one from a link. Null: the player backed out. */
 async function chooseRun(seed?: number): Promise<RunState | null> {
   const save = loadExpedition();
-  if (seed !== undefined) return newRun(seed);
+  // A shared run: start it, unless that would throw away a run in progress (then ask).
+  if (seed !== undefined && (!save.run || save.run.seed === seed)) return save.run ?? newRun(seed);
   const best = save.best.depth ? `<p class="exp-best">${icon('trophy', 14)} ${t('exp.best', { depth: save.best.depth, score: save.best.score })}</p>` : '';
   const saved = save.run;
   const el = h(
     'div',
     'modal',
     `<div class="card exp-card">
-      <div class="card-head"><h2>${t('title.expedition')}</h2><button class="icon-btn" data-c="back" aria-label="${t('common.back')}">${icon('close', 18)}</button></div>
-      <p class="exp-lead">${t('exp.lead')}</p>
+      <div class="card-head"><h2>${t('title.expedition')}</h2><button class="icon-btn" data-c="back" data-back aria-label="${t('common.back')}">${icon('close', 18)}</button></div>
+      <p class="exp-lead">${t(seed !== undefined ? 'exp.sharedLead' : 'exp.lead')}</p>
       ${best}
       <div class="actions column">
-        ${saved ? `<button class="big-btn primary" data-c="resume">${icon('play', 16)} ${t('exp.continue', { n: saved.depth + 1, score: saved.score })}</button>` : ''}
+        ${seed !== undefined ? `<button class="big-btn primary" data-c="shared">${icon('share', 16)} ${t('exp.playShared')}</button>` : ''}
+        ${saved ? `<button class="big-btn ${seed !== undefined ? 'ghost' : 'primary'}" data-c="resume">${icon('play', 16)} ${t('exp.continue', { n: saved.depth + 1, score: saved.score })}</button>` : ''}
         <button class="big-btn ${saved ? 'ghost' : 'primary'}" data-c="new">${icon('map', 16)} ${t('exp.new')}</button>
       </div>
     </div>`,
@@ -82,6 +85,10 @@ async function chooseRun(seed?: number): Promise<RunState | null> {
     };
   });
   if (c === 'resume' && saved) return saved;
+  if (c === 'shared' && seed !== undefined) {
+    if (saved) endRun(saved);
+    return newRun(seed);
+  }
   if (c === 'new') {
     if (saved) endRun(saved);
     return newRun();

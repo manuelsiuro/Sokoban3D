@@ -15,7 +15,7 @@ const LOGO = `<svg class="logo-crate" viewBox="0 0 160 150" aria-hidden="true">
   <path d="M30 47 L80 22" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
 </svg>`;
 
-export type TitleChoice = 'play' | 'worlds' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install';
+export type TitleChoice = 'play' | 'worlds' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install' | 'help';
 
 export interface TitleInfo {
   stars: number;
@@ -30,9 +30,12 @@ export interface TitleInfo {
   /** The next level to play (name and number), or null when every level is solved. */
   next: { name: string; number: number } | null;
   fresh: boolean;
+  /** Sound effects off, music on. */
   muted: boolean;
-  /** Flips sound on or off; returns whether it's now muted. */
-  toggleSound: () => boolean;
+  music: boolean;
+  /** Flip the effects or the music; each returns whether it's now on. */
+  toggleSfx: () => boolean;
+  toggleMusic: () => boolean;
   /** Expedition: open once the Meadow is cleared; the run in progress, if any. */
   expedition: { open: boolean; run: { depth: number; score: number } | null };
 }
@@ -43,8 +46,11 @@ export interface TitleInfo {
  */
 export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoice> {
   const done = ((info.stars / Math.max(1, info.maxStars)) * 100).toFixed(1);
-  const sub = info.next ? t('title.nextLine', { label: t(info.fresh ? 'title.startWith' : 'title.next'), n: info.next.number, name: info.next.name }) : t('title.allSolved');
-  const sound = (muted: boolean) => `${icon(muted ? 'mute' : 'sound', 16)}<span>${t(muted ? 'title.soundOff' : 'title.soundOn')}</span>`;
+  // A first visit: just the first level's name ("Play" says the rest); later, what's next.
+  const sub = info.next ? (info.fresh ? `${info.next.number}. ${info.next.name}` : t('title.nextLine', { label: t('title.next'), n: info.next.number, name: info.next.name })) : t('title.allSolved');
+  // Two switches: music and sound effects, each a pill that shows whether it's on.
+  const pill = (kind: 'music' | 'sfx', on: boolean) =>
+    `<button class="sound-toggle ${on ? '' : 'off'}" data-sound="${kind}" aria-pressed="${on}" aria-label="${t(kind === 'music' ? (on ? 'title.musicOn' : 'title.musicOff') : on ? 'title.sfxOn' : 'title.sfxOff')}">${icon(kind === 'music' ? (on ? 'music' : 'musicOff') : on ? 'sound' : 'mute', 16)}<span>${t(kind === 'music' ? 'title.music' : 'title.sfx')}</span></button>`;
   const el = h(
     'div',
     'title-screen',
@@ -85,11 +91,12 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           </button>
         </div>
       </div>
-      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="${t('title.settings')}">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>${t('title.install')}</span></button></div>
+      <div class="title-foot">${pill('music', info.music)}${pill('sfx', !info.muted)}<button class="help-btn-title" data-c="help" aria-label="${t('title.help')}">${icon('help', 16)}<span>${t('title.help')}</span></button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>${t('title.install')}</span></button></div>
       </div>
       <p class="keys-hint">${t('title.keys')}</p>
     </div>
-    <span class="title-version">v${__APP_VERSION__}</span>`,
+    <span class="title-version">v${__APP_VERSION__}</span>
+    <button class="icon-btn title-settings" data-c="settings" aria-label="${t('title.settings')}">${icon('gear', 20)}</button>`,
   );
   // Install app: shown while the game can be installed here (the offer may arrive later).
   const installBtn = el.querySelector<HTMLElement>('.install-btn')!;
@@ -101,10 +108,11 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
       const target = e.target as HTMLElement;
       const toggle = target.closest<HTMLElement>('[data-sound]');
       if (toggle) {
-        const muted = info.toggleSound();
-        toggle.classList.toggle('off', muted);
-        toggle.innerHTML = sound(muted);
-        if (!muted) click();
+        const kind = toggle.dataset.sound as 'music' | 'sfx';
+        const on = kind === 'music' ? info.toggleMusic() : info.toggleSfx();
+        toggle.outerHTML = pill(kind, on);
+        el.querySelector<HTMLElement>(`[data-sound="${kind}"]`)?.focus({ preventScroll: true });
+        click();
         return;
       }
       const c = target.closest<HTMLElement>('[data-c]')?.dataset.c as TitleChoice | undefined;

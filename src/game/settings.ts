@@ -45,8 +45,16 @@ export const DEFAULT_SETTINGS: Settings = {
   lang: 'auto',
 };
 
+/** Stored settings, each field checked against its default's type (a bad value gets the default). */
 export function loadSettings(): Settings {
-  return { ...DEFAULT_SETTINGS, ...readJSON<Partial<Settings>>(KEYS.settings, {}) };
+  const raw = readJSON<Record<string, unknown>>(KEYS.settings, {});
+  const s = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
+  if (raw && typeof raw === 'object') for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) if (typeof raw[k] === typeof v) s[k] = raw[k];
+  const out = s as unknown as Settings;
+  if (!['auto', 'high', 'medium', 'low'].includes(out.quality)) out.quality = 'auto';
+  if (!['auto', 'en', 'fr'].includes(out.lang)) out.lang = 'auto';
+  for (const k of ['sfxVolume', 'musicVolume'] as const) out[k] = Math.min(1, Math.max(0, Number.isFinite(out[k]) ? out[k] : DEFAULT_SETTINGS[k]));
+  return out;
 }
 
 export function saveSettings(s: Settings) {

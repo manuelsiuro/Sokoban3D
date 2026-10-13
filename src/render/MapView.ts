@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { rng } from '../sim/rng';
 import { biomeOf } from '../world/biomes';
 import { crateModel, decorModel, goalModel, mat, wallModel } from './models';
-import { cloudGeometry, spikeGeometry } from './shapes';
+import { bake, cloudGeometry, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 
 /**
@@ -28,23 +28,28 @@ export class MapView {
   private now = 0;
   private raycaster = new THREE.Raycaster();
   private clouds: THREE.Object3D[] = [];
+  private sun: THREE.DirectionalLight;
 
   constructor(
     readonly renderer: THREE.WebGLRenderer,
     worlds: { id: string }[],
   ) {
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a9a, 1.3));
-    const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
+    // The sun (and its shadow box) follows the camera's focus along the line of islands.
+    const sun = (this.sun = new THREE.DirectionalLight(0xfff1d6, 2.2));
     sun.position.set(-10, 20, 12);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.02;
     const sc = sun.shadow.camera;
-    sc.left = -30;
-    sc.right = 30;
-    sc.top = 30;
-    sc.bottom = -30;
-    sc.far = 80;
-    this.scene.add(sun);
+    sc.left = -24;
+    sc.right = 24;
+    sc.top = 24;
+    sc.bottom = -24;
+    sc.near = 1;
+    sc.far = 70;
+    this.scene.add(sun, sun.target);
     this.skyCanvas = document.createElement('canvas');
     this.sky = skyTexture(0x6ec3f0, 0xdff3f7, this.skyCanvas);
     this.scene.background = this.sky;
@@ -163,6 +168,8 @@ export class MapView {
     // Portrait screens pull back, so the neighbours stay in view.
     const back = 22 / Math.min(1, this.camera.aspect * 1.1);
     const f = this.shownFocus;
+    this.sun.position.set(f.x - 10, f.y + 20, f.z + 12);
+    this.sun.target.position.copy(f);
     this.camera.position.set(f.x, f.y + back * 0.5, f.z + back);
     // Aim below the island, so it floats above the world card.
     this.camera.lookAt(f.x, f.y - 2.2, f.z);
@@ -187,8 +194,8 @@ function greyOf(m: THREE.Material | THREE.Material[]): THREE.Material {
 function buildIsland(world: string, seed: number): THREE.Group {
   const b = biomeOf(world);
   const R = rng(seed * 7919 + 13);
-  const g = new THREE.Group();
-  g.userData.world = world;
+  const parts = new THREE.Group();
+  const g = parts;
   const top = new RoundedBoxGeometry(1, 0.3, 1, 1, 0.06);
   const cells: [number, number][] = [];
   for (let x = -2; x <= 2; x++)
@@ -220,14 +227,24 @@ function buildIsland(world: string, seed: number): THREE.Group {
     d.position.set(x, 0, z);
     g.add(d);
   }
-  g.traverse((o) => {
+  // Baked into one mesh per material (the map shows eight islands at once).
+  parts.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.castShadow = true;
+  });
+  const island = bake(parts);
+  island.userData.world = world;
+  island.traverse((o) => {
     if (o instanceof THREE.Mesh) {
-      o.castShadow = true;
       o.receiveShadow = true;
       o.userData.base = o.material;
+      // Glows (the goal's light column) keep their look when locked.
+      if ((o.material as THREE.Material).transparent) {
+        o.userData.tint = false;
+        o.castShadow = false;
+      }
     }
   });
-  return g;
+  return island;
 }
 
 function keep(m: THREE.Mesh, x: number, y: number, z: number) {

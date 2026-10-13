@@ -9,10 +9,10 @@ import { Atmosphere } from './atmosphere';
 import { Particles } from './particles';
 import { Post, type Quality } from './post';
 import { clock, iceShader, lavaShader } from './shaders';
-import { bake, plain, spikeGeometry } from './shapes';
+import { bake, plain, roughen, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 import { CRATE_COLORS, Mechanics, dressCrate, symbolMesh, tileColor } from './mechanics';
-import { CRATE, crateModel, decorModel, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
+import { CRATE, crateModel, decorModel, disposeTree, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
 
 /** World height of one level (a crate's height, so a crate in a dip is flush with the floor). */
 export const LEVEL_H = CRATE;
@@ -57,7 +57,8 @@ export class View {
   /** Half the island's longest side, rim included (what must fit across a narrow screen). */
   private halfSpan = 5;
   private crates: { group: THREE.Group; panels: THREE.MeshStandardMaterial; tween: Tween | null; lost: boolean }[] = [];
-  private goals: { cell: number; glow: THREE.MeshStandardMaterial }[] = [];
+  /** Goals: the pulsing groove, and the light column (faded out while covered). */
+  private goals: { cell: number; glow: THREE.MeshStandardMaterial; column: THREE.MeshBasicMaterial; beam: THREE.Object3D; shown: number }[] = [];
   private mech: Mechanics | null = null;
   /** Each crate's tween is a pop (scale down and up) instead of a slide: it teleported. */
   private pops = new Set<number>();
@@ -72,8 +73,10 @@ export class View {
   private dur = MOVE_T;
   private now = 0;
   private fx = new Particles(this.root);
-  /** The level's entrance (fly-in, island rising) and exit (sinking): start times, or -1. */
-  private introAt = -1;
+  /** The level's entrance (fly-in, island rising): progress 0..1, or -1; and how fast it runs. */
+  private introE = -1;
+  private introRate = 1 / 1.1;
+  /** The exit (sinking): start time, or -1. */
   private outroAt = -1;
   private outroDone: (() => void) | null = null;
   /** Screen shake: strength, fading out. */
@@ -95,6 +98,17 @@ export class View {
   private orbiting = false;
   reducedMotion = false;
   private post: Post;
+  private skyCanvas = document.createElement('canvas');
+  private sky: THREE.CanvasTexture | null = null;
+  private fog = new THREE.Fog(0xffffff, 30, 80);
+  /** The arms' reach (0 at rest, 1 reaching forward) and which leg leads the next hop. */
+  private reach = 0;
+  private stride = 1;
+  /** Scratch space for the frame loop (nothing is allocated per frame). */
+  private tmp = new THREE.Vector3();
+  private target = new THREE.Vector3();
+  private onGoal: boolean[] = [];
+  private covered = new Set<number>();
 
   constructor(readonly renderer: THREE.WebGLRenderer) {
     renderer.shadowMap.enabled = true;
@@ -148,12 +162,17 @@ export class View {
    * front of it (depth test reversed), so it's never lost behind a wall after a turn.
    */
   private addXray() {
-    const shell = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.26, 0.42, 4, 12),
-      new THREE.MeshBasicMaterial({ color: 0x8fd0ff, transparent: true, opacity: 0.45, depthWrite: false, depthFunc: THREE.GreaterDepth }),
-    );
-    shell.position.y = 0.45;
-    shell.renderOrder = 5;
+    // Drawn in the opaque pass after the world (render order 0) and before the pusher itself
+    // (1), so only walls and crates in front reveal it, never the pusher's own arms or brim.
+    const m = new THREE.MeshBasicMaterial({ color: 0x8fd0ff, opacity: 0.45, depthWrite: false, depthFunc: THREE.GreaterDepth });
+    m.blending = THREE.CustomBlending;
+    m.blendSrc = THREE.SrcAlphaFactor;
+    m.blendDst = THREE.OneMinusSrcAlphaFactor;
+    this.player.group.traverse((o) => (o.renderOrder = 1));
+    const shell = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.42, 4, 12), m);
+    shell.position.y = 0.475;
+    shell.renderOrder = 0.5;
+    shell.userData.noAO = true;
     this.player.group.add(shell);
   }
 
@@ -169,8 +188,13 @@ export class View {
   setLevel(level: LevelDef, grid: Grid, state: GameState) {
     this.grid = grid;
     const b = (this.biome = biomeOf(level.world));
+    // Free the previous level's meshes (geometries and the materials they own).
+    disposeTree(this.world);
     this.world.clear();
-    for (const c of this.crates) this.root.remove(c.group);
+    for (const c of this.crates) {
+      this.root.remove(c.group);
+      disposeTree(c.group);
+    }
     this.crates = [];
     this.goals = [];
     this.wonAt = -1;
@@ -181,8 +205,10 @@ export class View {
     this.shakeAmp = 0;
     const R = rng(hash(level.id));
     // Sky, fog and light.
-    this.scene.background = skyTexture(b.skyTop, b.skyBottom);
-    this.scene.fog = new THREE.Fog(b.fog, 30, 80);
+    this.sky = skyTexture(b.skyTop, b.skyBottom, this.skyCanvas, this.sky ?? undefined);
+    this.scene.background = this.sky;
+    this.fog.color.set(b.fog);
+    this.scene.fog = this.fog;
     this.hemi.color.set(0xffffff);
     this.hemi.groundColor.set(b.soil);
     this.hemi.intensity = b.ambient;
@@ -203,11 +229,15 @@ export class View {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (solid(x + dx, y + dy)) return true;
       return false;
     };
-    const tiles: [THREE.BufferGeometry[], THREE.BufferGeometry[]] = [[], []];
     const special = new Map<string, { geos: THREE.BufferGeometry[]; m: THREE.Material }>();
+    /** Plain ground (checker, rim, higher and lower ground): one vertex-colored mesh. */
+    const ground: THREE.BufferGeometry[] = [];
     const soil: THREE.BufferGeometry[] = [];
     const rock: THREE.BufferGeometry[] = [];
+    const lip: THREE.BufferGeometry[] = [];
     const island: [number, number, number][] = [];
+    const tops = new Map<string, number>();
+    const key = (x: number, y: number) => `${x},${y}`;
     for (let y = -1; y < H - 1; y++)
       for (let x = -1; x < W - 1; x++) {
         const c = at(x, y);
@@ -218,41 +248,90 @@ export class View {
         if (!isSolid) for (let d = 0; d < 4; d++) if (solid(x + DX[d], y + DY[d])) z = Math.min(z, grid.floor[at(x + DX[d], y + DY[d])]);
         if (z === 99) z = 0;
         island.push([x, y, z]);
-        const wx = x - (grid.w - 1) / 2;
-        const wz = y - (grid.h - 1) / 2;
-        const top = z * LEVEL_H;
-        const look = isSolid ? tileColor(grid, c) : null;
+        tops.set(key(x, y), z);
+      }
+    const inIsland = (x: number, y: number) => tops.has(key(x, y));
+    // What shades a corner of a floor tile: a wall, or ground higher than the tile.
+    const blocks = (x: number, y: number, z: number) => {
+      const c = at(x, y);
+      if (c >= 0 && grid.wall[c]) return 1;
+      const t = tops.get(key(x, y));
+      return t !== undefined && t > z ? 1 : 0;
+    };
+    const AO = [1, 0.78, 0.65, 0.56];
+    const rimTint = new THREE.Color(b.soil);
+    const col = new THREE.Color();
+    for (const [x, y, z] of island) {
+      const c = at(x, y);
+      const isSolid = solid(x, y);
+      const wx = x - (grid.w - 1) / 2;
+      const wz = y - (grid.h - 1) / 2;
+      const top = z * LEVEL_H;
+      const look = isSolid ? tileColor(grid, c) : null;
+      if (look) {
         const tile = tileGeometry.clone().translate(wx, top - 0.15, wz);
-        if (look) {
-          const k = `${look.color}`;
-          if (!special.has(k)) {
+        const k = `${look.color}`;
+        if (!special.has(k)) {
           const m = mat(look.color, look.opts);
           if (grid.tile[c] === TILE.lava) lavaShader(m);
           if (grid.tile[c] === TILE.ice) iceShader(m);
           special.set(k, { geos: [], m });
         }
-          special.get(k)!.geos.push(tile);
-        } else if (z !== 0) {
-          // Higher ground is lighter, dips darker, so the levels read at a glance.
-          const k = `z${z}|${(x + y) & 1}`;
-          if (!special.has(k)) {
-            const base = new THREE.Color((x + y) & 1 ? b.ground2 : b.ground);
-            base.lerp(new THREE.Color(z > 0 ? 0xffffff : 0x000000), Math.min(0.5, Math.abs(z) * 0.16));
-            special.set(k, { geos: [], m: mat(base.getHex(), { rough: 0.95 }) });
-          }
-          special.get(k)!.geos.push(tile);
-        } else tiles[(x + y) & 1].push(tile);
-        const colH = top + 0.5;
-        if (colH > 0.01) soil.push(new THREE.BoxGeometry(1, colH, 1).translate(wx, top - 0.3 - colH / 2 + 0.02, wz));
+        special.get(k)!.geos.push(tile);
+      } else {
+        // Higher ground is lighter, dips darker, so the levels read at a glance; the rim is a
+        // little darker than the playable floor; each tile varies a touch in tone and height.
+        col.set((x + y) & 1 ? b.ground2 : b.ground);
+        if (z !== 0) col.lerp(new THREE.Color(z > 0 ? 0xffffff : 0x000000), Math.min(0.5, Math.abs(z) * 0.16));
+        if (!isSolid) col.lerp(rimTint, 0.16).multiplyScalar(0.94);
+        col.multiplyScalar(0.97 + R.next() * 0.06);
+        const tile = plain(tileGeometry.clone()).translate(0, (R.next() - 0.5) * 0.014, 0);
+        const p = tile.attributes.position;
+        const colors = new Float32Array(p.count * 3);
+        for (let v = 0; v < p.count; v++) {
+          const sx = p.getX(v) > 0 ? 1 : -1;
+          const sz = p.getZ(v) > 0 ? 1 : -1;
+          let shade = 0.72;
+          if (p.getY(v) > 0.1) {
+            const s1 = blocks(x + sx, y, z);
+            const s2 = blocks(x, y + sz, z);
+            shade = AO[s1 && s2 ? 3 : s1 + s2 + blocks(x + sx, y + sz, z)];
+          } else if (p.getY(v) > -0.1) shade = 0.86;
+          colors.set([col.r * shade, col.g * shade, col.b * shade], v * 3);
+        }
+        tile.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        ground.push(tile.translate(wx, top - 0.15, wz));
       }
+      const colH = top + 0.5;
+      if (colH > 0.01) soil.push(new THREE.BoxGeometry(1, colH, 1).translate(wx, top - 0.3 - colH / 2 + 0.02, wz));
+      // A lip of grass (sand, snow) over the island's outer edge, with a few drips.
+      if (b.lip !== undefined) {
+        const out = [0, 1, 2, 3].map((d) => !inIsland(x + DX[d], y + DY[d]));
+        for (let d = 0; d < 4; d++) {
+          if (!out[d]) continue;
+          const along = DX[d] === 0;
+          const slab = roughen(new THREE.BoxGeometry(along ? 1.03 : 0.15, 0.13, along ? 0.15 : 1.03, along ? 4 : 1, 1, along ? 1 : 4), 0.04, R.next);
+          lip.push(slab.translate(wx + DX[d] * 0.5, top - 0.07, wz + DY[d] * 0.5));
+          // Outer corners get a corner piece.
+          const e = (d + 1) % 4;
+          if (out[e]) lip.push(roughen(new THREE.BoxGeometry(0.15, 0.12, 0.15), 0.02, R.next).translate(wx + (DX[d] + DX[e]) * 0.5, top - 0.065, wz + (DY[d] + DY[e]) * 0.5));
+          const drips = Math.floor(R.next() * 2.6);
+          for (let k = 0; k < drips; k++) {
+            const len = 0.07 + R.next() * 0.16;
+            const t = (R.next() - 0.5) * 0.8;
+            const drip = new THREE.ConeGeometry(0.03 + R.next() * 0.03, len, 5).rotateX(Math.PI);
+            lip.push(plain(drip).translate(wx + DX[d] * 0.52 + (along ? t : 0), top - 0.12 - len / 2 + 0.01, wz + DY[d] * 0.52 + (along ? 0 : t)));
+          }
+        }
+      }
+    }
     // The rock under the island: deeper toward the middle, like a floating chunk of land.
-    const key = (x: number, y: number) => `${x},${y}`;
-    const inIsland = new Set(island.map(([x, y]) => key(x, y)));
+    // Spikes are jittered in size and place (and some cells get two) so no grid shows.
     for (const [x, y, z] of island) {
       let edge = 0;
       for (let r = 1; r < 6; r++) {
         let ok = true;
-        for (let d = 0; d < 4; d++) if (!inIsland.has(key(x + DX[d] * r, y + DY[d] * r))) ok = false;
+        for (let d = 0; d < 4; d++) if (!inIsland(x + DX[d] * r, y + DY[d] * r)) ok = false;
         if (!ok) break;
         edge = r;
       }
@@ -262,9 +341,11 @@ export class View {
       // Below the cell's own floor (pits and lava sit lower than the ground around them).
       const base = Math.min(0, z) * LEVEL_H - 0.3;
       soil.push(new THREE.BoxGeometry(1, 0.5, 1).translate(wx, base - 0.25, wz));
-      // A band of rock, then a craggy spike: together they hang like a chunk of land.
-      rock.push(plain(new THREE.BoxGeometry(0.98, 0.3, 0.98).translate(wx, base - 0.65, wz)));
-      rock.push(spikeGeometry(R.next, 0.66 + R.next() * 0.1, depth * 1.2).translate(wx, base - 0.78, wz));
+      // A band of rock, then craggy spikes: together they hang like a chunk of land.
+      rock.push(roughen(new THREE.BoxGeometry(1.02, 0.3, 1.02, 2, 1, 2), edge ? 0.02 : 0.09, R.next).translate(wx, base - 0.65, wz));
+      const j = edge ? 0.3 : 0.12;
+      rock.push(spikeGeometry(R.next, 0.5 + R.next() * 0.3, depth * (0.95 + R.next() * 0.5)).translate(wx + (R.next() - 0.5) * j, base - 0.76, wz + (R.next() - 0.5) * j));
+      if (R.next() < 0.4) rock.push(spikeGeometry(R.next, 0.25 + R.next() * 0.2, depth * (0.4 + R.next() * 0.4)).translate(wx + (R.next() - 0.5) * 0.7, base - 0.72, wz + (R.next() - 0.5) * 0.7));
     }
     const add = (geos: THREE.BufferGeometry[], m: THREE.Material, cast = false) => {
       if (!geos.length) return;
@@ -274,11 +355,11 @@ export class View {
       this.world.add(merged);
       for (const g of geos) g.dispose();
     };
-    add(tiles[0], mat(b.ground, { rough: 0.95 }));
-    add(tiles[1], mat(b.ground2, { rough: 0.95 }));
+    add(ground, mat(0xffffff, { rough: 0.95, vertexColors: true }));
     for (const { geos, m } of special.values()) add(geos, m);
     add(soil, mat(b.soil, { rough: 1 }), true);
     add(rock, mat(b.rock, { rough: 1, flat: true }), true);
+    if (b.lip !== undefined) add(lip, mat(b.lip, { rough: 0.95, flat: true }), true);
 
     // Walls, goals, decor. Walls and decor are merged into a few meshes.
     const statics = new THREE.Group();
@@ -289,10 +370,12 @@ export class View {
         statics.add(w);
       }
       if (grid.goal[c]) {
-        const { group, glow } = goalModel(b);
+        const { group, glow, column } = goalModel(b);
         if (grid.goalColor[c]) {
-          glow.color.set(CRATE_COLORS[grid.goalColor[c]]);
-          glow.emissive.set(CRATE_COLORS[grid.goalColor[c]]);
+          const hue = CRATE_COLORS[grid.goalColor[c]];
+          glow.color.set(hue);
+          glow.emissive.set(hue);
+          column.color.set(hue);
           const sym = symbolMesh(grid.goalColor[c] - 1, 0.13, 0xffffff, 0.9);
           if (sym) {
             sym.position.y = 0.03;
@@ -301,10 +384,13 @@ export class View {
         }
         this.pos(c, grid.floor[c], group.position);
         this.world.add(group);
-        this.goals.push({ cell: c, glow });
+        this.goals.push({ cell: c, glow, column, beam: group.getObjectByName('column')!, shown: 1 });
       }
     }
-    if (this.mech) this.root.remove(this.mech.group);
+    if (this.mech) {
+      this.root.remove(this.mech.group);
+      this.mech.dispose();
+    }
     this.mech = new Mechanics(grid, (c, z, out) => this.pos(c, z, out), LEVEL_H);
     this.root.add(this.mech.group);
     for (const [x, y, z] of island) {
@@ -326,7 +412,7 @@ export class View {
 
     // Crates.
     for (let k = 0; k < grid.crates.length; k++) {
-      const c = crateModel(b, grid.crateKind[k] === 0 ? this.look : undefined);
+      const c = crateModel(b, grid.crateKind[k] === 0 ? this.look : undefined, hash(level.id) + k);
       dressCrate(c.group, c.panels, grid.crateKind[k]);
       c.panels.userData.base = c.panels.color.getHex();
       this.root.add(c.group);
@@ -380,6 +466,7 @@ export class View {
     const onPad = (c: number) => c >= 0 && this.grid!.tile[c] === TILE.teleport;
     this.pops.clear();
     if (teleported) this.dur = 0.3;
+    const moved: number[] = [];
     s.crates.forEach((c, k) => {
       const view = this.crates[k];
       const to = c.cell < 0 ? null : this.pos(c.cell, c.z).add(new THREE.Vector3(0, CRATE / 2, 0));
@@ -409,18 +496,21 @@ export class View {
       if (animate && was && was.cell >= 0 && (was.cell !== c.cell || was.z !== c.z)) {
         const from = this.pos(was.cell, was.z).add(new THREE.Vector3(0, CRATE / 2, 0));
         view.tween = { from, to, drop: c.z < was.z };
-        this.crateStop[k] = this.now + this.dur;
+        moved.push(k);
       } else {
         view.tween = null;
         view.group.position.copy(to);
       }
     });
+    // After the loop: a crate lost over the edge may have made the move longer.
+    for (const k of moved) this.crateStop[k] = this.now + this.dur;
     const pTo = this.pos(s.cell, s.z);
     if (teleported && prev && onPad(s.cell) && prev.cell !== s.cell) this.pops.add(-1);
     if (animate && prev && prev.cell !== s.cell) {
       this.playerTween = { from: this.pos(prev.cell, prev.z), to: pTo, drop: false };
       this.landAt = this.now + this.dur;
       this.hop = s.z > prev.z ? 0.45 : s.z < prev.z ? 0.25 : 0.08;
+      this.stride = -this.stride;
     } else {
       this.playerTween = null;
       this.player.group.position.copy(pTo);
@@ -433,7 +523,7 @@ export class View {
     this.pulling = (s.events & EVENT.pull) !== 0 && prev !== null && s.moves > prev.moves;
     // Feedback.
     if (animate && prev && s.moves > prev.moves) {
-      this.introAt = -1;
+      this.skipIntro();
       const g = this.grid;
       const at = (cell: number, z: number, y = 0.05) => this.pos(cell, z).add(new THREE.Vector3(0, y, 0));
       // A puff where the pusher took off; dust behind anything sliding on ice.
@@ -611,20 +701,30 @@ export class View {
 
   /** The level comes in: the camera flies down while the island rises from the clouds. */
   intro() {
+    this.settleOutro();
     if (this.reducedMotion) return;
-    this.introAt = this.now;
-    this.outroAt = -1;
+    this.introE = 0;
+    this.introRate = 1 / 1.1;
   }
 
-  /** Ends the entrance at once (the player started moving). */
+  /** Hurries the entrance to its end (over a moment, so nothing jumps): the player started moving. */
   skipIntro() {
-    this.introAt = -1;
+    if (this.introE >= 0) this.introRate = Math.max(this.introRate, (1 - this.introE) / 0.15);
+  }
+
+  /** Resolves a pending exit (a new exit or entrance replaces it). */
+  private settleOutro() {
+    const done = this.outroDone;
+    this.outroDone = null;
+    this.outroAt = -1;
+    done?.();
   }
 
   /** The island sinks into the clouds; resolves when it's gone (at once with reduced motion). */
   leave(): Promise<void> {
+    this.settleOutro();
     if (this.reducedMotion || !this.grid) return Promise.resolve();
-    this.introAt = -1;
+    this.introE = -1;
     this.outroAt = this.now;
     return new Promise((r) => (this.outroDone = r));
   }
@@ -639,7 +739,8 @@ export class View {
     this.now = time;
     const t = Math.min(1, (time - this.t0) / this.dur);
     const ease = 1 - (1 - t) * (1 - t);
-    for (const c of this.crates) {
+    for (let k = 0; k < this.crates.length; k++) {
+      const c = this.crates[k];
       if (!c.tween) continue;
       const { from, to, drop } = c.tween;
       if (drop) {
@@ -647,7 +748,7 @@ export class View {
         const slide = Math.min(1, t / 0.45);
         const fall = Math.max(0, (t - 0.45) / 0.55);
         c.group.position.set(from.x + (to.x - from.x) * slide, from.y + (to.y - from.y) * fall * fall, from.z + (to.z - from.z) * slide);
-      } else if (this.pops.has(this.crates.indexOf(c))) {
+      } else if (this.pops.has(k)) {
         c.group.position.copy(t < 0.5 ? from : to);
         c.group.scale.setScalar(Math.max(0.05, Math.abs(1 - 2 * t)));
       } else c.group.position.lerpVectors(from, to, ease);
@@ -679,11 +780,22 @@ export class View {
     let df = this.facing - this.facingFrom;
     df = ((((df + 2) % 4) + 4) % 4) - 2;
     p.group.rotation.y = (this.facingFrom + df * Math.min(1, t * 1.8)) * (Math.PI / 2);
-    // Lean into a push; a little bob while idle; a happy spin once solved.
-    // Lean into a push, lean back hauling a pull.
+    // Lean into a push, lean back hauling a pull; a little bob while idle; a happy spin once solved.
     p.body.rotation.x = (this.pushing ? 0.25 : this.pulling ? -0.3 : 0) * (t < 1 ? Math.sin(Math.PI * t) : 0);
-    p.body.position.y = Math.max(0, Math.sin(time * 3) * 0.015);
-    if (this.wonAt >= 0) {
+    p.body.position.y = this.reducedMotion ? 0 : Math.max(0, Math.sin(time * 3) * 0.015);
+    // Arms reach forward while pushing or pulling (and a moment after), swing on a plain hop;
+    // the legs stride on a hop.
+    const working = (this.pushing || this.pulling) && time - this.t0 < this.dur + 0.35;
+    this.reach += ((working ? 1 : 0) - this.reach) * (this.reducedMotion ? 1 : Math.min(1, dt * 16));
+    const hopping = this.playerTween !== null && !this.pops.has(-1);
+    const swing = hopping ? Math.sin(Math.PI * t) * this.stride : 0;
+    p.arms.forEach((a, k) => {
+      const side = k ? 1 : -1;
+      a.rotation.x = -this.reach * (this.pulling ? 1.25 : 1.4) + swing * side * 0.6 * (1 - this.reach);
+      a.rotation.z = side * (0.18 - this.reach * 0.1);
+    });
+    p.legs.forEach((l, k) => (l.rotation.x = swing * (k ? 0.7 : -0.7)));
+    if (this.wonAt >= 0 && !this.reducedMotion) {
       const w = time - this.wonAt;
       if (w < 1.2) {
         p.body.position.y = Math.abs(Math.sin(w * Math.PI * 2.5)) * 0.35 * (1 - w / 1.2);
@@ -705,35 +817,41 @@ export class View {
       c.group.scale.set(1 + 0.07 * w, 1 - 0.1 * w, 1 + 0.07 * w);
     });
     // Coming in and going out: the whole island rises from below, or sinks away.
-    if (this.introAt >= 0) {
-      const e = Math.min(1, (time - this.introAt) / 1.1);
+    if (this.introE >= 0) {
+      const e = (this.introE = Math.min(1, this.introE + dt * this.introRate));
       const back = 1 + 2.2 * (e - 1) ** 3 + 1.2 * (e - 1) ** 2;
       this.root.position.y = -7 * (1 - back);
       if (e >= 1) {
-        this.introAt = -1;
+        this.introE = -1;
         this.root.position.y = 0;
       }
     } else if (this.outroAt >= 0) {
       const e = Math.min(1, (time - this.outroAt) / 0.5);
       this.root.position.y = -9 * e * e;
-      if (e >= 1) {
-        this.outroAt = -1;
-        this.outroDone?.();
-        this.outroDone = null;
-      }
+      if (e >= 1) this.settleOutro();
     } else this.root.position.y = 0;
     // Goals pulse until covered; crates on goals glow.
     if (this.state && this.grid) {
-      const onGoal = new Set<number>();
+      const grid = this.grid;
+      const onGoal = this.onGoal;
+      const covered = this.covered;
+      covered.clear();
       this.state.crates.forEach((c, k) => {
-        if (c.cell >= 0 && this.grid!.goal[c.cell] && this.grid!.floor[c.cell] === c.z && !this.crates[k].tween) onGoal.add(k);
+        onGoal[k] = c.cell >= 0 && grid.goal[c.cell] === 1 && grid.floor[c.cell] === c.z && !this.crates[k].tween;
+        if (onGoal[k]) covered.add(c.cell);
       });
-      const covered = new Set(this.state.crates.filter((c, k) => onGoal.has(k) && c).map((c) => c.cell));
-      for (const g of this.goals) g.glow.emissiveIntensity = covered.has(g.cell) ? 1.4 : 0.45 + 0.35 * Math.sin(time * 3);
+      for (const g of this.goals) {
+        const on = covered.has(g.cell);
+        g.glow.emissiveIntensity = on ? 1.4 : 0.45 + 0.35 * Math.sin(time * 3);
+        // The light column fades out under a crate and back when it leaves.
+        g.shown += ((on ? 0 : 1) - g.shown) * Math.min(1, dt * 7);
+        g.column.opacity = g.shown * (0.17 + 0.05 * Math.sin(time * 2.2 + g.cell));
+        g.beam.visible = g.shown > 0.02;
+      }
       // Once solved, the crates flash one after another.
       const won = this.wonAt >= 0 ? time - this.wonAt : -1;
       this.crates.forEach((c, k) => {
-        const on = onGoal.has(k);
+        const on = onGoal[k];
         c.panels.emissive.set(on ? this.biome.goal : 0x000000);
         const flash = won >= 0 ? Math.max(0, 1 - Math.abs(won - 0.25 - k * 0.14) / 0.18) : 0;
         c.panels.emissiveIntensity = on ? 0.35 + flash * 1.1 : 0;
@@ -747,13 +865,14 @@ export class View {
       this.ghost.rotation.y += d * Math.min(1, dt * 12);
     }
     if (this.hintArrow?.visible && this.state) {
-      const at = this.pos(this.state.cell, this.state.z);
-      const bob = 0.55 + Math.sin(time * 6) * 0.08;
+      // Follows the pusher as it moves (the state's cell is already the end of the move).
+      const at = this.player.group.position;
+      const bob = 0.55 + (this.reducedMotion ? 0 : Math.sin(time * 6) * 0.08);
       this.hintArrow.position.set(at.x + DX[this.hintDir] * bob, at.y + 0.5, at.z + DY[this.hintDir] * bob);
     }
     this.fx.update(dt);
     if (!this.reducedMotion) {
-      this.air?.update(time, dt);
+      this.air?.update(time, dt, this.camera.position);
       for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
     }
     this.placeCamera(dt);
@@ -762,7 +881,7 @@ export class View {
   }
 
   private placeCamera(dt: number) {
-    if (this.orbiting) this.yaw += dt * 0.04;
+    if (this.orbiting && !this.reducedMotion) this.yaw += dt * 0.04;
     this.shownYaw += (this.yaw - this.shownYaw) * Math.min(1, dt * (this.orbiting ? 2 : 6));
     let a = this.shownYaw * (Math.PI / 2);
     let pitch = 1.08;
@@ -773,7 +892,7 @@ export class View {
     const glide = Math.min(1, dt * 4);
     this.aimSpan.radius += (want.radius - this.aimSpan.radius) * glide;
     this.aimSpan.half += (want.half - this.aimSpan.half) * glide;
-    const target = this.center.clone();
+    const target = this.target.copy(this.center);
     if (framed && this.grid) {
       const p = this.player.group.position;
       const mx = Math.max(0, this.grid.w / 2 - 4);
@@ -785,8 +904,8 @@ export class View {
     const tan = Math.tan((this.camera.fov * Math.PI) / 360);
     let dist = Math.max((this.aimSpan.radius / tan) * 0.92, (this.aimSpan.half / (tan * this.camera.aspect)) * 1.04) + 1;
     // The fly-in: from high and far, easing down onto the island.
-    if (this.introAt >= 0) {
-      const e = Math.min(1, (this.now - this.introAt) / 1.1);
+    if (this.introE >= 0) {
+      const e = this.introE;
       const k = (1 - e) ** 3;
       dist *= 1 + 0.9 * k;
       pitch += 0.3 * k;
@@ -799,13 +918,16 @@ export class View {
       a += 0.32 * ease;
       dist *= 1 - 0.1 * ease;
     }
+    // Fog starts just in front of the island and thickens past it, at any camera distance.
+    this.fog.near = dist * 0.9;
+    this.fog.far = dist + 50;
     this.camera.position.set(c.x + Math.sin(a) * Math.cos(pitch) * dist, c.y + Math.sin(pitch) * dist, c.z + Math.cos(a) * Math.cos(pitch) * dist);
     // On tall screens, aim a little toward the camera: the island rises above the touch controls.
     const lift = this.camera.aspect < 1 ? 0.9 : 0;
     this.camera.lookAt(c.x + Math.sin(a) * lift, c.y - 0.3, c.z + Math.cos(a) * lift);
     if (this.shakeAmp > 0.002) {
       const s = this.shakeAmp;
-      this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));
+      this.camera.position.add(this.tmp.set((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));
       this.shakeAmp *= Math.exp(-dt * 9);
     } else this.shakeAmp = 0;
   }

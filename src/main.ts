@@ -2,7 +2,7 @@ import './styles/index.css';
 import './app/boot';
 import { LEVELS } from './levels/levels';
 import { WORLDS } from './levels/worlds';
-import { applyLook, applySound, click, map, newTrophies, screen, settings, showLevel, view, worldIndex } from './app/context';
+import { applyLook, applySound, click, map, newTrophies, screen, settings, showLevel, toast, view, worldIndex } from './app/context';
 import { resetProgress, saveSettings } from './game/settings';
 import { ACHIEVEMENTS, builtOne, earned, unlockedCosmetics } from './game/achievements';
 import { today } from './game/daily';
@@ -10,6 +10,7 @@ import { currentStreak, loadDaily } from './game/dailyProgress';
 import { decodeLevel } from './game/share';
 import { isWorldOpen, loadProgress, nextLevel, totalStars, worldLevels } from './game/progress';
 import { showTitle } from './ui/screens/title';
+import { showHelp } from './ui/screens/help';
 import { levelText, setLang, t } from './i18n';
 import { TOUCH } from './ui/dom';
 import { setHaptics } from './app/haptics';
@@ -69,14 +70,21 @@ async function titleFlow() {
         next: next === null ? null : { name: t('title.nextName', { name: levelText(LEVELS[next]).name, world: WORLDS[worldIndex(next)].name }), number: worldLevels(LEVELS[next].world).findIndex(({ i }) => i === next) + 1 },
         fresh: Object.keys(p).length === 0,
         muted: settings.muted,
+        music: settings.music,
         daily: { streak: currentStreak(date), stars: loadDaily().results[date]?.stars ?? 0 },
         expedition: { open: expeditionOpen(p), run: loadExpedition().run },
         trophies: { have: have.size, total: ACHIEVEMENTS.length },
-        toggleSound: () => {
+        toggleSfx: () => {
           settings.muted = !settings.muted;
           saveSettings(settings);
           applySound();
-          return settings.muted;
+          return !settings.muted;
+        },
+        toggleMusic: () => {
+          settings.music = !settings.music;
+          saveSettings(settings);
+          applySound();
+          return settings.music;
         },
       },
       click,
@@ -86,6 +94,7 @@ async function titleFlow() {
     else if (choice === 'daily') await dailyFlow();
     else if (choice === 'expedition') await expeditionFlow();
     else if (choice === 'workshop') await workshopFlow();
+    else if (choice === 'help') await showHelp({ open: new Set(WORLDS.filter((_, k) => isWorldOpen(k, p)).map((w) => w.id)) }, click);
     else if (choice === 'install') {
       if (installKind() === 'prompt') await promptInstall();
       else await showInstallHelp(click);
@@ -127,9 +136,15 @@ async function titleFlow() {
 // An expedition link (#exp=<seed>) starts that run.
 const shared = location.hash.startsWith('#lvl=') ? decodeLevel(location.hash.slice(5)) : null;
 const expSeed = /^#exp=(\d{1,10})$/.exec(location.hash)?.[1];
-if (location.hash.startsWith('#lvl=') || expSeed) history.replaceState(null, '', location.pathname + location.search);
+const brokenLink = (location.hash.startsWith('#lvl=') && !shared) || (location.hash.startsWith('#exp=') && !expSeed);
+if (location.hash.startsWith('#lvl=') || location.hash.startsWith('#exp=')) history.replaceState(null, '', location.pathname + location.search);
 const devLevel = import.meta.env.DEV ? LEVELS.findIndex((l) => l.id === new URLSearchParams(location.search).get('level')) : -1;
 if (shared) sharedFlow(shared.level, shared.par).then(titleFlow);
+else if (brokenLink) {
+  // A link that doesn't open: say so, rather than land on the title silently.
+  titleFlow();
+  setTimeout(() => toast(t('share.broken')), 600);
+}
 else if (expSeed) expeditionFlow(Number(expSeed)).then(titleFlow);
 else if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
 else titleFlow();

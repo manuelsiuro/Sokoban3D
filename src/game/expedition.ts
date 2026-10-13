@@ -38,8 +38,12 @@ export interface ExpeditionSave {
 }
 
 export const loadExpedition = (): ExpeditionSave => {
-  const s = readJSON<Partial<ExpeditionSave>>(KEYS.expedition, {});
-  return { run: s.run ?? null, best: s.best ?? { depth: 0, score: 0 }, runs: s.runs ?? 0 };
+  const s = readJSON<Partial<ExpeditionSave>>(KEYS.expedition, {}) ?? {};
+  const r = s.run;
+  // A run saved in a shape this version can't play is dropped, not crashed on.
+  const ok = !!r && [r.seed, r.depth, r.score, r.compasses].every(Number.isFinite) && Array.isArray(r.stars);
+  const best = s.best && Number.isFinite(s.best.depth) && Number.isFinite(s.best.score) ? s.best : { depth: 0, score: 0 };
+  return { run: ok ? r! : null, best, runs: Number.isFinite(s.runs) ? s.runs! : 0 };
 };
 const save = (s: ExpeditionSave) => writeJSON(KEYS.expedition, s);
 

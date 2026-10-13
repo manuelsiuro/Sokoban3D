@@ -21,7 +21,10 @@ plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](
 - **Grand Islands**: a four-room finale per world; the camera follows on phones (V: whole island).
 - **Expedition**: endless generated islands through every world, compasses to skip, seeded runs (`#exp=`).
 - **Time Trial**: replay a cleared world against the clock for bronze, silver and gold, with a real-time ghost.
-- **Trophies** that unlock crate skins and outfits; generated music per world; settings.
+- **How to play**: basics, every world's rule with a picture, and the modes (title, the HUD's ?,
+  or the ? key); new worlds open with a card on their rule.
+- **Trophies** that unlock crate skins and outfits; generated music per world; settings, with
+  Music and Sounds switches on the title.
 - **Polish**: bloom and soft shadows with quality tiers, level fly-ins and transitions, squash and
   stretch, screen shake, pooled particles, per-world atmosphere (clouds, snow, embers, motes),
   mixed audio with per-world reverb, vibration, tap-to-move, gamepads, color symbols, a tutorial.
@@ -68,7 +71,8 @@ npx tsx scripts/dev/buildgrand.ts [world ...]      # rebuild Grand Islands (src/
 ## Controls
 
 Arrows or WASD to move (relative to the camera), Shift + direction to pull (Mirror Grove),
-Z undo, Y redo, R restart, H hint, Q/E turn the camera, V whole island, Esc back. On touch
+Z undo, Y redo, R restart, H hint, Q/E turn the camera, V whole island, ? help, Esc back (the
+hints show the letters of the player's keyboard layout, e.g. AZERTY). On touch
 screens: swipe, tap where to go, or use the d-pad. Gamepads: d-pad/stick, A (hold to pull),
 B undo, X hint, Y restart, shoulders turn the camera.
 In dev, `?level=<id>` opens a level straight away.

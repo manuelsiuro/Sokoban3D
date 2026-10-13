@@ -109,7 +109,7 @@ export const SKY: LevelDef[] = [
     name: "Terrace Garden",
     world: W,
     difficulty: 3,
-    tip: "Turn the camera (Q/E) to see the steps clearly.",
+    tip: "Turn the camera (↺ ↻) to see the steps clearly.",
     map: [
       '########',
       '#      #',

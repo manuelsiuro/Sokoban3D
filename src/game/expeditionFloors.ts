@@ -31,12 +31,15 @@ export function recipe(depth: number) {
   return { world: b.world, gen: { crates, w: size, h: size, ...b.gen }, par: [Math.round(lo), Math.round(hi)] as [number, number] };
 }
 
+/** The generator's seed for one try at a floor: the run's seed mixed (so runs never share floors), then the depth and try. */
+const floorSeed = (seed: number, depth: number, round: number) => (Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ (depth * 4 + round)) >>> 0;
+
 /** The floor at `depth` of the run `seed` (deterministic). Null if none could be made. */
 export function expeditionFloor(seed: number, depth: number): Floor | null {
   const r = recipe(depth);
   let fallback: Floor | null = null;
   for (let round = 0; round < 4; round++) {
-    const cands = propose({ tries: 120, states: 120000, ...r.gen, seed: (seed % 100000) * 1000 + depth * 8 + round });
+    const cands = propose({ tries: 120, states: 120000, ...r.gen, seed: floorSeed(seed, depth, round) });
     const pick = cands.find((c) => c.par >= r.par[0] && c.par <= r.par[1]) ?? null;
     const any = pick ?? cands[0];
     if (!any) continue;

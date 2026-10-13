@@ -1,5 +1,6 @@
 import { TOUCH } from '../ui/dom';
 import { t } from '../i18n';
+import { keyLabel } from '../i18n/keys';
 
 /**
  * The tutorial: on the first Meadow levels, short prompts that each wait for the player to
@@ -21,7 +22,12 @@ const STEPS: Record<string, Step[]> = {
     { text: () => t(TOUCH ? 'coach.moveTouch' : 'coach.moveKeys'), until: 'move' },
     { text: () => t('coach.push'), until: 'goal' },
   ],
-  'meadow-2': [{ text: () => t('coach.undo', { key: TOUCH ? '↶' : 'Z' }), after: 2, until: 'undo', ms: 9000 }],
+  'meadow-2': [
+    { text: () => t('coach.stars'), ms: 7000 },
+    { text: () => t('coach.undo', { key: TOUCH ? '↶' : keyLabel('KeyZ') }), after: 2, until: 'undo', ms: 9000 },
+  ],
+  'meadow-4': [{ text: () => t(TOUCH ? 'coach.restartTouch' : 'coach.restartKeys'), after: 3, ms: 8000 }],
+  'meadow-5': [{ text: () => t('coach.help'), ms: 7000 }],
   'reverse-1': [{ text: () => t(TOUCH ? 'coach.pullTouch' : 'coach.pullKeys'), until: 'move', ms: 12000 }],
   'meadow-3': [{ text: () => t('coach.hint', { key: t(TOUCH ? 'coach.bulb' : 'coach.bulbKey') }), ms: 8000 }],
 };
@@ -44,6 +50,12 @@ export class Coach {
     this.shown = false;
     this.maybeShow();
     return this.steps.length > 0;
+  }
+
+  /** The level is over: no more prompts. */
+  stop() {
+    clearTimeout(this.timer);
+    this.steps = [];
   }
 
   on(e: CoachEvent) {

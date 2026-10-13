@@ -34,7 +34,7 @@ export const CLOCKWORK: LevelDef[] = [
     name: "Portal",
     world: W,
     difficulty: 1,
-    tip: "Stop on a pad and you come out of its twin. Crates too.",
+    tip: "Stop on a portal and you come out of its twin. Crates too.",
     map: [
       '#######',
       '#     #',
@@ -84,7 +84,7 @@ export const CLOCKWORK: LevelDef[] = [
     name: "Wormhole",
     world: W,
     difficulty: 2,
-    tip: "A pad whose twin is taken does nothing.",
+    tip: "A portal whose twin is taken does nothing.",
     map: [
       '########',
       '#  ##@ #',
@@ -190,7 +190,7 @@ export const CLOCKWORK: LevelDef[] = [
     name: "Mainspring",
     world: W,
     difficulty: 4,
-    tip: "Two pairs of pads.",
+    tip: "Two pairs of portals.",
     map: [
       '#########',
       '##@ #.  #',

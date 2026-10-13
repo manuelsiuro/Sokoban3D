@@ -130,7 +130,7 @@ export const MEADOW: LevelDef[] = [
     name: 'Orchard',
     world: W,
     difficulty: 4,
-    tip: 'Rotate the camera with Q and E to see behind the hedges.',
+    tip: 'Turn the camera (the ↺ ↻ buttons, or Q and E) to see behind the hedges.',
     map: [
       '########',
       '##     #',

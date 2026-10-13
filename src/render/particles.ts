@@ -8,6 +8,8 @@ export type Kind = 'shard' | 'puff' | 'spark';
 
 interface P {
   m: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  /** Its own material, for puffs (each fades on its own); shards and sparks share one per color. */
+  own: THREE.MeshStandardMaterial;
   v: THREE.Vector3;
   life: number;
   max: number;
@@ -24,18 +26,32 @@ const GEO: Record<Kind, THREE.BufferGeometry> = {
 };
 const POOL = 220;
 
+/** Shards and sparks never fade (they shrink): one opaque material per kind and color. */
+const solid = new Map<string, THREE.MeshStandardMaterial>();
+function solidOf(kind: Kind, color: number) {
+  const key = `${kind}|${color}`;
+  let m = solid.get(key);
+  if (!m) {
+    const glow = kind === 'spark';
+    m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: glow ? 1.6 : 0.4, roughness: 0.6 });
+    solid.set(key, m);
+  }
+  return m;
+}
+
 export class Particles {
   private free: P[] = [];
   private live: P[] = [];
 
   constructor(parent: THREE.Object3D) {
     for (let k = 0; k < POOL; k++) {
-      const m = new THREE.Mesh(GEO.shard, new THREE.MeshStandardMaterial({ transparent: true, roughness: 0.6 }));
+      const own = new THREE.MeshStandardMaterial({ transparent: true, roughness: 0.9, depthWrite: false });
+      const m = new THREE.Mesh(GEO.shard, own);
       m.visible = false;
       m.castShadow = false;
       m.renderOrder = 3;
       parent.add(m);
-      this.free.push({ m, v: new THREE.Vector3(), life: 0, max: 1, spin: 0, kind: 'shard', size: 1, gravity: 6 });
+      this.free.push({ m, own, v: new THREE.Vector3(), life: 0, max: 1, spin: 0, kind: 'shard', size: 1, gravity: 6 });
     }
   }
 
@@ -47,12 +63,11 @@ export class Particles {
       if (!p) return;
       p.kind = kind;
       p.m.geometry = GEO[kind];
-      const glow = kind === 'spark';
-      p.m.material.color.set(color);
-      p.m.material.emissive.set(glow || kind === 'shard' ? color : 0x000000);
-      p.m.material.emissiveIntensity = glow ? 1.6 : 0.4;
-      p.m.material.opacity = kind === 'puff' ? 0.75 : 1;
-      p.m.material.depthWrite = kind !== 'puff';
+      if (kind === 'puff') {
+        p.m.material = p.own;
+        p.own.color.set(color);
+        p.own.opacity = 0.75;
+      } else p.m.material = solidOf(kind, color);
       p.m.position.copy(at);
       if (opts.spread) p.m.position.add(new THREE.Vector3((Math.random() - 0.5) * opts.spread.x, (Math.random() - 0.5) * opts.spread.y, (Math.random() - 0.5) * opts.spread.z));
       const a = Math.random() * Math.PI * 2;

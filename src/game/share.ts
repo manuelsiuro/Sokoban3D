@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { LevelDef } from '../levels/types';
 import { parseLevel } from '../sim/grid';
 
@@ -34,7 +35,7 @@ export function decodeLevel(code: string): { level: LevelDef; par: number } | nu
   try {
     const p = JSON.parse(fromB64(code)) as Partial<Packed>;
     if (p.v !== 1 || !Array.isArray(p.m)) return null;
-    const level: LevelDef = { id: 'shared', name: String(p.n || 'Shared level').slice(0, 40), world: 'meadow', difficulty: 3, tip: 'A level someone built in the workshop.', map: p.m, heights: p.h, tiles: p.t, kinds: p.k };
+    const level: LevelDef = { id: 'shared', name: String(p.n || t('shared.label')).slice(0, 40), world: 'meadow', difficulty: 3, tip: t('shared.tip'), map: p.m, heights: p.h, tiles: p.t, kinds: p.k };
     parseLevel(level);
     return { level, par: Number(p.p) || 0 };
   } catch {

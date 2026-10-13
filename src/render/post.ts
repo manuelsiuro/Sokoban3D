@@ -33,8 +33,7 @@ export class Post {
     camera: THREE.Camera,
   ) {
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
-    this.composer = new EffectComposer(renderer, target);
+    this.composer = new EffectComposer(renderer, this.target(size, 4));
     this.composer.addPass(new RenderPass(scene, camera));
     this.gtao = new GTAOPass(scene, camera, size.x, size.y);
     this.gtao.blendIntensity = 0.75;
@@ -44,7 +43,7 @@ export class Post {
     const ao = this.gtao as unknown as { _overrideVisibility: () => void; _visibilityCache: THREE.Object3D[] };
     ao._overrideVisibility = () => {
       scene.traverse((o) => {
-        const see = o instanceof THREE.Mesh && !Array.isArray(o.material) && o.material.transparent;
+        const see = o instanceof THREE.Mesh && (o.userData.noAO || (!Array.isArray(o.material) && o.material.transparent));
         if (o.visible && (see || o instanceof THREE.Points || o instanceof THREE.Line)) {
           o.visible = false;
           ao._visibilityCache.push(o);
@@ -69,8 +68,16 @@ export class Post {
     return this.tier;
   }
 
+  /** The composer's half-float target; multisampled (4x) only on the high tier. */
+  private target(size: THREE.Vector2, samples: number) {
+    return new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples });
+  }
+
   private apply(t: Tier) {
     this.tier = t;
+    // Phones run medium: 2x keeps edges clean at a fraction of 4x's cost.
+    const samples = t === 'high' ? 4 : t === 'medium' ? 2 : 0;
+    if (this.composer.renderTarget1.samples !== samples) this.composer.reset(this.target(this.renderer.getDrawingBufferSize(new THREE.Vector2()), samples));
     this.gtao.enabled = t === 'high';
     this.bloom.enabled = t !== 'low';
     this.onTier(t);

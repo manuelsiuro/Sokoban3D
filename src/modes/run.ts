@@ -11,6 +11,9 @@ import { levelText, t, type Key } from '../i18n';
 import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
 import { formatTime } from '../game/score';
+import { isWorldOpen, loadProgress } from '../game/progress';
+import { WORLDS } from '../levels/worlds';
+import { showHelp } from '../ui/screens/help';
 import { TOUCH, h, setText } from '../ui/dom';
 import { icon } from '../ui/icons';
 
@@ -24,7 +27,8 @@ const hud = h(
   'hud hidden',
   `<div class="hud-top">
      <button class="icon-btn" data-a="back" data-l="hud.back">${icon('chevronLeft')}</button>
-     <div class="hud-title"><small></small><b></b></div>
+     <button class="hud-title" data-a="tip" data-l="hud.tipAgain"><small></small><b></b></button>
+     <button class="icon-btn hud-help" data-a="help" data-l="hud.help">${icon('help')}</button>
      <span class="hud-pills"><span class="pill big hud-moves"><b>0</b>&nbsp;<small>/ par 0</small></span><span class="pill big hud-timer gone">${icon('clock', 16)}<b>0.0</b><i class="hud-pen"></i></span></span>
    </div>
    <div class="hud-bar">
@@ -38,7 +42,7 @@ const hud = h(
      <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
      <button class="icon-btn" data-a="right" data-l="hud.turnRight">${icon('rotateRight')}</button>
    </div>
-   <p class="hud-tip gone"></p>
+   <p class="hud-tip gone" role="status" aria-live="polite"></p>
    ${
      TOUCH
        ? `<div class="dpad">${[0, 1, 2, 3].map((d) => `<button data-d="${d}" data-l="${['hud.up', 'hud.right', 'hud.down', 'hud.left'][d]}">${icon(['up', 'chevronRight', 'down', 'chevronLeft'][d], 26)}</button>`).join('')}</div>`
@@ -123,6 +127,8 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
     run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip };
     $('.hud-skip').classList.toggle('gone', opts.skip === undefined);
     $('.hud-timer').classList.toggle('gone', !opts.timed);
+    // The clock doesn't stop for the rules: no help button against it.
+    $('.hud-help').classList.toggle('gone', !!opts.timed || !!opts.autoplay);
     if (opts.timed) {
       const tg = opts.timed.ghost;
       const steps = settings.ghost && tg && runSolves(level, tg.moves) ? ghostPath(level, tg.moves) : null;
@@ -154,6 +160,17 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   });
 }
 
+// Time Trial: time spent away (another app, a call) is not counted.
+let hiddenAt = -1;
+document.addEventListener('visibilitychange', () => {
+  const tm = run?.timed;
+  if (document.hidden) hiddenAt = performance.now();
+  else if (hiddenAt >= 0) {
+    if (tm && tm.start >= 0 && !run!.over) tm.start += performance.now() - hiddenAt;
+    hiddenAt = -1;
+  }
+});
+
 /** The Time Trial clock: elapsed ms with penalties (0 before the first move). */
 const elapsed = (r: Run) => (!r.timed || r.timed.start < 0 ? 0 : (r.over ? r.timed.final : performance.now() - r.timed.start + r.timed.penalty));
 
@@ -175,6 +192,8 @@ function endRun(state: GameState | null, skipped = false) {
   const r = run;
   if (!r) return;
   stopWalk();
+  clearTimeout(repeat);
+  coach.stop();
   clearInterval(r.timer);
   view.setGhost(null);
   document.body.classList.remove('is-playing');
@@ -237,7 +256,9 @@ function present(prev: GameState, forward: boolean) {
     sound.win();
     buzz('win');
     view.celebrate();
-    setTimeout(() => endRun(s), 1500);
+    // Only this run: a level started meanwhile is not closed by the old one's win.
+    const r = run;
+    setTimeout(() => run === r && endRun(s), 1500);
   }
 }
 
@@ -314,12 +335,25 @@ function act(a: string) {
   stopWalk();
   if (a === 'back') {
     click();
-    endRun(null);
+    // Leaving during the win celebration keeps the solve.
+    endRun(run.over && !run.watching ? screen.sim.state : null);
     return;
   }
   if (a === 'left' || a === 'right') {
     view.rotate(a === 'left' ? -1 : 1);
     click();
+    return;
+  }
+  if (a === 'tip') {
+    click();
+    const text = levelText(run.level).tip;
+    if (text) say(text, 9000);
+    return;
+  }
+  if (a === 'help') {
+    click();
+    const p = loadProgress();
+    showHelp({ open: new Set(WORLDS.filter((_, k) => isWorldOpen(k, p)).map((w) => w.id)), world: run.level.world }, click);
     return;
   }
   if (a === 'overview' && view.follows) {
@@ -390,11 +424,12 @@ const coach = new Coach((text, ms) => say(text, ms));
 async function askHint() {
   if (!run || run.over) return;
   click();
-  const asked = screen.sim.frame;
+  const asked = screen.sim.raw;
   const r = run;
   say(t('hud.thinking'), 20000);
   const answer = await hint(screen.sim.level, screen.sim.raw);
-  if (run !== r || screen.sim.frame !== asked || r.over) return;
+  // The same position (an undo then another move can reach the same frame with a different one).
+  if (run !== r || screen.sim.raw !== asked || r.over) return;
   r.clean = false;
   if (answer.solution) {
     const c = answer.solution[0];
@@ -409,6 +444,13 @@ async function askHint() {
 const KEYS: Record<string, number> = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
 const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', KeyV: 'overview', Escape: 'back' };
 addEventListener('keydown', (e) => {
+  // A dialog over the level (help, a card) takes the keys.
+  if (run && document.querySelector('.modal')) return;
+  if (run && e.key === '?') {
+    e.preventDefault();
+    if (!run.timed && !run.watching) act('help');
+    return;
+  }
   if (!run || e.metaKey || e.ctrlKey || e.altKey) {
     // Ctrl/Cmd+Z also undoes.
     if (run && (e.metaKey || e.ctrlKey) && e.code === 'KeyZ') {
@@ -423,6 +465,11 @@ addEventListener('keydown', (e) => {
     // Held keys repeat at the animation's pace.
     if (e.repeat && view.animating) return;
     move(d, e.shiftKey);
+    return;
+  }
+  // A focused HUD button must not be pressed again by Space or Enter.
+  if (e.code === 'Space' || e.code === 'Enter') {
+    if (!(e.target as HTMLElement).closest?.('.modal')) e.preventDefault();
     return;
   }
   const a = ACTIONS[e.code];
@@ -461,6 +508,7 @@ for (const pad of hud.querySelectorAll<HTMLElement>('[data-d]')) {
   const up = () => clearTimeout(repeat);
   pad.addEventListener('pointerup', up);
   pad.addEventListener('pointercancel', up);
+  pad.addEventListener('lostpointercapture', up);
 }
 let swipe: { x: number; y: number; id: number; moved: boolean; t: number } | null = null;
 renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -484,4 +532,4 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 });
 renderer.domElement.addEventListener('pointercancel', () => (swipe = null));
 
-startGamepad({ playing: () => !!run, move: (d, pull) => move(d, pull), act });
+startGamepad({ playing: () => !!run && !document.querySelector('.modal'), move: (d, pull) => move(d, pull), act });

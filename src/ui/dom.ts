@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 /** Small DOM helpers shared by the HUD and the screens. */
 
 export const h = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = '') => {
@@ -37,11 +39,11 @@ export function carousel(row: HTMLElement, arrow: (dir: 'left' | 'right') => str
   row.replaceWith(wrap);
   const prev = document.createElement('button');
   prev.className = 'carousel-arrow prev';
-  prev.setAttribute('aria-label', 'Scroll left');
+  prev.setAttribute('aria-label', t('scroll.left'));
   prev.innerHTML = arrow('left');
   const next = document.createElement('button');
   next.className = 'carousel-arrow next';
-  next.setAttribute('aria-label', 'Scroll right');
+  next.setAttribute('aria-label', t('scroll.right'));
   next.innerHTML = arrow('right');
   wrap.append(prev, row, next);
   const update = () => {
@@ -71,3 +73,54 @@ export function carousel(row: HTMLElement, arrow: (dir: 'left' | 'right') => str
   requestAnimationFrame(update);
   return update;
 }
+
+/**
+ * Dialogs (every `.modal`): announced as dialogs, focus moved in (and kept in with Tab),
+ * Escape presses their close or done button. Watching the page means each screen gets this
+ * without wiring it up.
+ */
+const topModal = () => {
+  const all = document.querySelectorAll<HTMLElement>('.modal');
+  return all.length ? all[all.length - 1] : null;
+};
+const focusables = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex]:not([tabindex="-1"])')].filter((b) => b.offsetParent !== null);
+new MutationObserver((records) => {
+  for (const r of records)
+    for (const n of r.addedNodes) {
+      if (!(n instanceof HTMLElement) || !n.classList.contains('modal')) continue;
+      const card = n.querySelector<HTMLElement>('.card') ?? n;
+      if (!card.hasAttribute('role')) card.setAttribute('role', 'dialog');
+      card.setAttribute('aria-modal', 'true');
+      const head = card.querySelector('h2');
+      if (head && !card.hasAttribute('aria-labelledby') && !card.hasAttribute('aria-label')) card.setAttribute('aria-label', head.textContent ?? '');
+      if (!n.contains(document.activeElement)) {
+        const first = n.querySelector<HTMLElement>('.primary') ?? focusables(n)[0];
+        // Keyboard players land on the main button; on touch screens no ring shows.
+        first?.focus({ preventScroll: true, focusVisible: !TOUCH } as FocusOptions);
+      }
+    }
+}).observe(document.body, { childList: true });
+addEventListener(
+  'keydown',
+  (e) => {
+    const m = topModal();
+    if (!m) return;
+    if (e.key === 'Escape') {
+      const close = m.querySelector<HTMLElement>('[data-done], [data-back]');
+      if (close) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        close.click();
+      }
+    } else if (e.key === 'Tab') {
+      const f = focusables(m);
+      if (!f.length) return;
+      const at = f.indexOf(document.activeElement as HTMLElement);
+      if (at < 0 || (e.shiftKey && at === 0) || (!e.shiftKey && at === f.length - 1)) {
+        e.preventDefault();
+        f[e.shiftKey ? f.length - 1 : 0].focus();
+      }
+    }
+  },
+  true,
+);

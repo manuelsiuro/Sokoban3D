@@ -104,6 +104,10 @@ r = after(row('#@$   #', '   1 1 '), 'r');
 log('a crate pushed onto a pad comes out of the other', r.s.crates[0].cell === 7 + 5 && (r.s.events & EVENT.teleport) !== 0);
 r = after(row('#@$   #', '   1 1 '), 'rr');
 log('nothing comes out of a pad that is taken', r.s.x === 3);
+r = after(row('#@$  #', '  11  '), 'r');
+log('a crate never teleports onto the cell the player steps into', r.s.crates[0].cell === 6 + 3 && r.s.x === 2 && r.s.z === 0 && (r.s.events & EVENT.teleport) === 0);
+r = after(row('#@    #', '  >1 1 '), 'r');
+log('a conveyor carries the player onto a pad, and it teleports', r.s.x === 5 && (r.s.events & EVENT.teleport) !== 0);
 
 // Gates flip every move.
 r = after(row('#@  #', '  g  '), 'r');
@@ -119,6 +123,14 @@ log('a mirror crate turns the beam onto the receiver', new Sim(laser('   /   '))
 log('a plain crate blocks the beam', new Sim(laser('       ')).state.world.lit.length === 0);
 r = after(row('#@$.$.#', '', '  rbbr '), 'r');
 log('a colored goal wants its color', !r.s.solved && (r.s.events & EVENT.goalOn) === 0);
+
+// The move count tops out without breaking its parity (gates read it).
+const long = new Sim(row('#@ #', ''));
+long.raw[3] = 32767;
+long.move(1);
+const m1 = long.state.moves;
+long.move(3);
+log('past 32767 moves the count steps back by one, keeping its parity', m1 === 32766 && long.state.moves === 32767);
 
 // The record: undo, redo, replace.
 const sim = new Sim(lv(['########', '#@ $  .#', '########']));

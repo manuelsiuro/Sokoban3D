@@ -525,3 +525,178 @@ input:focus-visible + .switch {
 .exp-card .summary-stats {
   margin: 14px 0 6px;
 }
+
+/* How to play: tabs over a scrolling list of rules, each with a small picture. */
+.help-card {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100dvh - 32px));
+  padding: 20px 20px 12px;
+  text-align: left;
+}
+
+.help-card .card-head {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.help-tabs {
+  margin: 0 0 10px;
+}
+
+.help-tabs button {
+  flex: 1;
+  justify-content: center;
+}
+
+.help-body {
+  flex: 1;
+  min-height: 0;
+  margin: 0 -8px;
+  padding: 2px 8px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+}
+
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e6ecf2;
+}
+
+.help-row:last-child {
+  border-bottom: 0;
+}
+
+.help-row h3 {
+  margin: 0 0 3px;
+  font: 700 16px var(--font-display);
+}
+
+.help-row p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.help-row small {
+  font: 700 10.5px var(--font-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.help-pic {
+  flex: none;
+  max-width: 42%;
+  height: auto;
+  filter: drop-shadow(0 3px 6px rgba(20, 50, 90, 0.15));
+}
+
+.help-ic,
+.help-stars {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  color: var(--accent);
+  background: #eaf3fd;
+}
+
+.help-stars {
+  font-size: 15px;
+  letter-spacing: -1px;
+  color: #f2a51f;
+  background: #fff4dc;
+}
+
+.help-world.here {
+  margin: 0 -8px;
+  padding: 12px 8px;
+  border-radius: 14px;
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 2px #b9d8fb;
+}
+
+.help-world.locked .help-ic {
+  color: #8a99ab;
+  background: #eef1f5;
+}
+
+.help-world.locked h3 {
+  color: var(--ink-soft);
+}
+
+.help-sub {
+  margin: 14px 0 6px;
+  font: 700 16px var(--font-display);
+}
+
+.help-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-buttons li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.help-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 2px 6px rgba(20, 50, 90, 0.14), inset 0 0 0 1px #e1e7ee;
+}
+
+.help-keys {
+  margin: 14px 0 4px;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 440px) {
+  .help-row {
+    align-items: flex-start;
+  }
+  .help-pic {
+    max-width: 38%;
+  }
+}
+
+/* A new world's card: its rule, with the same picture as How to play. */
+.intro-pic {
+  display: grid;
+  place-items: center;
+  margin: 12px 0 4px;
+}
+
+.intro-pic .help-pic {
+  max-width: 100%;
+}
+
+.intro-card .actions {
+  flex-wrap: wrap;
+  justify-content: center;
+}

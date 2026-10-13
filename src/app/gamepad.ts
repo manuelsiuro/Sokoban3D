@@ -19,6 +19,7 @@ const AGAIN = 0.14;
 export function startGamepad(t: PadTarget) {
   const was = new Set<number>();
   let held = -1;
+  let wasPlaying = false;
   let heldSince = 0;
   let lastRepeat = 0;
   const focusable = () => [...document.querySelectorAll<HTMLElement>('button:not(:disabled), [tabindex="0"]')].filter((e) => e.offsetParent !== null && !e.closest('.hud.hidden'));
@@ -55,7 +56,7 @@ export function startGamepad(t: PadTarget) {
     best?.focus({ focusVisible: true } as FocusOptions);
   };
   const back = () => {
-    const b = document.querySelector<HTMLElement>('.modal [data-done], [data-back], .back-btn, [aria-label^="Back"]');
+    const b = document.querySelector<HTMLElement>('.modal [data-done], .modal [data-back], [data-back], .back-btn');
     b?.click();
   };
   const poll = (now: number) => {
@@ -71,6 +72,13 @@ export function startGamepad(t: PadTarget) {
     if (dir < 0 && Math.hypot(sx, sy) > 0.55) dir = Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 1 : 3) : sy > 0 ? 2 : 0;
     const time = now / 1000;
     let fire = false;
+    // Switching between menus and play: a direction still held doesn't carry over.
+    const playing = t.playing();
+    if (playing !== wasPlaying) {
+      wasPlaying = playing;
+      held = dir;
+      heldSince = lastRepeat = time;
+    }
     if (dir !== held) {
       held = dir;
       heldSince = lastRepeat = time;
@@ -79,7 +87,7 @@ export function startGamepad(t: PadTarget) {
       lastRepeat = time;
       fire = true;
     }
-    if (t.playing()) {
+    if (playing) {
       if (fire) t.move(dir, pressed(BTN.a));
       if (down(BTN.b)) t.act('undo');
       if (down(BTN.x)) t.act('hint');
@@ -89,7 +97,9 @@ export function startGamepad(t: PadTarget) {
       if (down(BTN.start) || down(BTN.select)) t.act('back');
     } else {
       if (fire) moveFocus(dir);
-      if (down(BTN.a)) (document.activeElement instanceof HTMLElement && layer().includes(document.activeElement) ? document.activeElement : layer()[0])?.click();
+      // Nothing focused: the layer's main button (not its close button).
+      const main = () => layer().find((b) => b.classList.contains('primary')) ?? layer()[0];
+      if (down(BTN.a)) (document.activeElement instanceof HTMLElement && layer().includes(document.activeElement) ? document.activeElement : main())?.click();
       if (down(BTN.b)) back();
     }
     was.clear();

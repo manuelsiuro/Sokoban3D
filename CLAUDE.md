@@ -19,4 +19,6 @@ Rules that matter every time:
   `git push --follow-tags origin main` (Actions deploys Pages) → poll the live bundle.
 - **Modes** live in `src/modes/` and play through `play()` in `run.ts`; shared objects come
   from `src/app/context.ts`. **Text** goes through `t()` (`src/i18n/`, English and French;
-  `i18ntest` checks French covers every key). Grand Islands: `scripts/dev/buildgrand.ts`.
+  `i18ntest` checks French covers every key; write keys as `%KeyW%` so labels follow the layout).
+  The rules players read live in `ui/screens/help.ts` (keep them in step with the sim).
+  Grand Islands: `scripts/dev/buildgrand.ts`.

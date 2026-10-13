@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { rng } from '../sim/rng';
 import type { Biome, DecorKind } from '../world/biomes';
-import { cloudGeometry, crystalGeometry, gearGeometry, roughen } from './shapes';
+import { cloudGeometry, crystalGeometry, gearGeometry, plain, roughen } from './shapes';
+import { fadeTexture, glowMaterial } from './shaders';
 
 /**
  * Procedural low-poly models: every piece is built from primitives in code, colored from
@@ -21,6 +23,30 @@ export function mat(color: number, opts: { rough?: number; metal?: number; emiss
   return m;
 }
 
+/** Marks a material as belonging to one model (disposeTree frees it with the model). */
+export function owned<T extends THREE.Material>(m: T): T {
+  m.userData.owned = true;
+  return m;
+}
+
+/** Marks a geometry as shared between models and levels (disposeTree never frees it). */
+export function shared<T extends THREE.BufferGeometry>(g: T): T {
+  g.userData.shared = true;
+  return g;
+}
+
+/**
+ * Frees what a model holds on the GPU: its geometries (unless shared) and the materials it
+ * owns. Cached materials (mat()) and shared geometries stay.
+ */
+export function disposeTree(root: THREE.Object3D) {
+  root.traverse((o) => {
+    if (!(o instanceof THREE.Mesh || o instanceof THREE.Points || o instanceof THREE.Line)) return;
+    if (!o.geometry.userData.shared) o.geometry.dispose();
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m.userData.owned) m.dispose();
+  });
+}
+
 const mesh = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh => {
   const o = new THREE.Mesh(geo, m);
   o.position.set(x, y, z);
@@ -29,84 +55,227 @@ const mesh = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0)
   return o;
 };
 
+/** Paints a geometry one color (a vertex color attribute), for parts merged under one material. */
+export function paint(geo: THREE.BufferGeometry, color: THREE.Color | number) {
+  const g = plain(geo);
+  const c = color instanceof THREE.Color ? color : new THREE.Color(color);
+  const a = new Float32Array(g.attributes.position.count * 3);
+  for (let k = 0; k < a.length; k += 3) a.set([c.r, c.g, c.b], k);
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  return g;
+}
+
+/** Merges parts (painted or not) into one geometry and frees the parts. */
+export function merge(parts: THREE.BufferGeometry[]) {
+  const g = mergeGeometries(parts);
+  for (const p of parts) p.dispose();
+  return g;
+}
+
 export const CRATE = 0.84;
 
-/** A wooden crate: a rounded frame, inset panels and a diagonal brace on each side. */
-export function crateModel(b: Biome, look?: { crate: number; trim: number }): { group: THREE.Group; panels: THREE.MeshStandardMaterial } {
+const dark = (c: number, k: number) => new THREE.Color(c).multiplyScalar(k);
+
+/**
+ * A wooden crate: real planks on each face with thin dark gaps, a frame of darker beams on
+ * the edges, a diagonal brace on each side and nail heads where it's fixed. Two meshes: the
+ * frame (one vertex-colored mesh) and the planks (their own material, so a crate on a goal
+ * can glow).
+ */
+export function crateModel(b: Biome, look?: { crate: number; trim: number }, seed = 1): { group: THREE.Group; panels: THREE.MeshStandardMaterial } {
   const g = new THREE.Group();
+  const r = rng(seed * 2654435761 + 7).next;
   const s = CRATE;
+  const h = s / 2;
   const trimColor = look && look.trim >= 0 ? look.trim : b.crateTrim;
-  g.add(mesh(new RoundedBoxGeometry(s, s, s, 2, 0.06), mat(trimColor, { rough: 0.9 })));
+  const trim = new THREE.Color(trimColor);
+  const iron = new THREE.Color(0x55505a);
+  const frame: THREE.BufferGeometry[] = [];
+  // The dark core shows through the gaps between planks.
+  frame.push(paint(new THREE.BoxGeometry(s - 0.06, s - 0.06, s - 0.06), dark(trimColor, 0.35)));
+  // Twelve edge beams.
+  const e = 0.1;
+  const off = h - e / 2 + 0.005;
+  for (const a of [-1, 1])
+    for (const c of [-1, 1]) {
+      frame.push(paint(new THREE.BoxGeometry(s + 0.01, e, e).translate(0, a * off, c * off), trim));
+      frame.push(paint(new THREE.BoxGeometry(e, s + 0.01, e).translate(a * off, 0, c * off), trim.clone().multiplyScalar(0.92)));
+      frame.push(paint(new THREE.BoxGeometry(e, e, s + 0.01).translate(a * off, c * off, 0), trim));
+    }
+  // Planks: three per face, a little uneven in tone.
+  const inner = s - 2 * e + 0.02;
+  const gap = 0.022;
+  const pw = (inner - gap * 2) / 3;
+  const pt = 0.035;
+  const face = h - 0.012 - pt / 2;
+  const planks: THREE.BufferGeometry[] = [];
+  const nail = new THREE.CylinderGeometry(0.013, 0.015, 0.014, 6);
+  const side = (rot: THREE.Euler, brace: boolean, flip: boolean) => {
+    const m = new THREE.Matrix4().makeRotationFromEuler(rot);
+    for (let k = 0; k < 3; k++) {
+      const y = (k - 1) * (pw + gap);
+      const tone = 0.86 + r() * 0.14;
+      planks.push(paint(new THREE.BoxGeometry(inner, pw, pt).translate((r() - 0.5) * 0.01, y, face + (r() - 0.5) * 0.004), new THREE.Color(tone, tone, tone)).applyMatrix4(m));
+    }
+    if (brace) {
+      const len = Math.hypot(inner, inner) - 0.06;
+      const bg = new THREE.BoxGeometry(len, 0.085, 0.03).rotateZ(flip ? Math.PI / 4 : -Math.PI / 4).translate(0, 0, face + pt / 2 + 0.012);
+      frame.push(paint(bg, trim.clone().multiplyScalar(0.85)).applyMatrix4(m));
+      const d = inner / 2 - 0.05;
+      for (const sgn of [-1, 1]) {
+        const n = nail.clone().rotateX(Math.PI / 2).translate(sgn * d, (flip ? sgn : -sgn) * d, face + pt / 2 + 0.03);
+        frame.push(paint(n, iron).applyMatrix4(m));
+      }
+    }
+    // Nails holding the planks to the frame.
+    for (const sgn of [-1, 1])
+      for (const k of [-1, 1]) {
+        const n = nail.clone().scale(0.85, 1, 0.85).rotateX(Math.PI / 2).translate(sgn * (h - e / 2), k * (pw + gap), h + 0.011);
+        frame.push(paint(n, iron).applyMatrix4(m));
+      }
+  };
+  for (let k = 0; k < 4; k++) side(new THREE.Euler(0, (k * Math.PI) / 2, 0), true, k % 2 === 1);
+  // The lid: planks only (a symbol or a mirror sits on it).
+  side(new THREE.Euler(-Math.PI / 2, 0, Math.PI / 2), false, false);
+  nail.dispose();
   // Panels get their own material, so a crate on a goal can glow.
-  const panels = new THREE.MeshStandardMaterial({ color: look && look.crate >= 0 ? look.crate : b.crate, roughness: 0.85 });
-  const p = s * 0.78;
-  const t = 0.03;
-  const face = new THREE.BoxGeometry(p, p, t);
-  const brace = new THREE.BoxGeometry(p * 1.25, 0.09, t);
-  const trim = mat(trimColor, { rough: 0.9 });
-  for (let k = 0; k < 4; k++) {
-    const side = new THREE.Group();
-    side.rotation.y = (k * Math.PI) / 2;
-    side.add(mesh(face, panels, 0, 0, s / 2));
-    const br = mesh(brace, trim, 0, 0, s / 2 + t);
-    br.rotation.z = k % 2 ? Math.PI / 4 : -Math.PI / 4;
-    side.add(br);
-    g.add(side);
-  }
-  const top = mesh(face, panels, 0, s / 2, 0);
-  top.rotation.x = -Math.PI / 2;
-  g.add(top);
-  const plank = mesh(new THREE.BoxGeometry(p, 0.02, 0.08), trim, 0, s / 2 + 0.02, 0);
-  g.add(plank);
+  const panels = owned(new THREE.MeshStandardMaterial({ color: look && look.crate >= 0 ? look.crate : b.crate, roughness: 0.85, vertexColors: true }));
+  g.add(mesh(merge(frame), mat(0xffffff, { rough: 0.85, vertexColors: true })));
+  g.add(mesh(merge(planks), panels));
   return { group: g, panels };
 }
 
-/** The pusher: a round little character with a cap, eyes on the front (+z). */
-export function playerModel(): { group: THREE.Group; body: THREE.Group; suit: THREE.MeshStandardMaterial; cap: THREE.MeshStandardMaterial } {
+/** Where the top of a crate's lid is (symbols lie just above it). */
+export const CRATE_LID = CRATE / 2 - 0.012;
+
+export interface Pusher {
+  group: THREE.Group;
+  body: THREE.Group;
+  suit: THREE.MeshStandardMaterial;
+  cap: THREE.MeshStandardMaterial;
+  /** Shoulder pivots (left, right): turned to reach forward when pushing or pulling. */
+  arms: THREE.Group[];
+  /** Hip pivots (left, right): they stride on a hop. */
+  legs: THREE.Group[];
+}
+
+/** The pusher: a round little character with a cap, arms and legs, eyes on the front (+z). */
+export function playerModel(): Pusher {
   const g = new THREE.Group();
   const body = new THREE.Group();
   g.add(body);
-  // The suit and cap have their own materials: outfits recolor them.
-  const suit = new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.6 });
-  const skin = mat(0xf2c9a0, { rough: 0.7 });
-  const cap = new THREE.MeshStandardMaterial({ color: 0xe0433a, roughness: 0.55 });
-  body.add(mesh(new THREE.CapsuleGeometry(0.2, 0.18, 4, 12), suit, 0, 0.29, 0));
-  body.add(mesh(new THREE.SphereGeometry(0.19, 16, 12), skin, 0, 0.66, 0));
-  const capTop = mesh(new THREE.SphereGeometry(0.2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), cap, 0, 0.7, 0);
-  body.add(capTop);
-  const brim = mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 16, 1, false, -Math.PI / 2, Math.PI), cap, 0, 0.71, 0.12);
-  body.add(brim);
-  const white = mat(0xffffff, { rough: 0.3 });
-  const black = mat(0x1a1a24, { rough: 0.3 });
-  for (const x of [-0.07, 0.07]) {
-    body.add(mesh(new THREE.SphereGeometry(0.045, 10, 8), white, x, 0.66, 0.165));
-    body.add(mesh(new THREE.SphereGeometry(0.025, 8, 6), black, x, 0.66, 0.2));
+  // The suit and cap have their own materials: outfits recolor them. Everything else on the
+  // body is one vertex-colored mesh (a dozen parts, one draw).
+  const suit = owned(new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.6 }));
+  const cap = owned(new THREE.MeshStandardMaterial({ color: 0xe0433a, roughness: 0.55 }));
+  const skinColor = 0xf2c9a0;
+  const skin = mat(skinColor, { rough: 0.7 });
+  const boot = mat(0x5a3a22, { rough: 0.7 });
+  body.add(mesh(new THREE.CapsuleGeometry(0.19, 0.12, 4, 14), suit, 0, 0.37, 0));
+  // The cap: a dome, a curved brim (a half disc bent down at the sides and the front), a button.
+  const brim = new THREE.CylinderGeometry(0.15, 0.15, 0.025, 20, 1, false, -Math.PI / 2, Math.PI);
+  const bp = brim.attributes.position;
+  for (let k = 0; k < bp.count; k++) {
+    const x = bp.getX(k);
+    const z = bp.getZ(k);
+    bp.setY(k, bp.getY(k) - x * x * 1.3 - z * z * 0.8);
   }
-  // A nose, rosy cheeks, a belt and a little backpack.
-  body.add(mesh(new THREE.SphereGeometry(0.035, 8, 6), mat(0xf0b48a, { rough: 0.6 }), 0, 0.62, 0.19));
-  for (const x of [-0.11, 0.11]) body.add(mesh(new THREE.SphereGeometry(0.03, 8, 6), mat(0xff9c8a, { rough: 0.8 }), x, 0.6, 0.15));
-  const belt = mesh(new THREE.TorusGeometry(0.205, 0.025, 6, 20), mat(0x5a3a22, { rough: 0.7 }), 0, 0.24, 0);
-  belt.rotation.x = Math.PI / 2;
-  body.add(belt);
-  body.add(mesh(new RoundedBoxGeometry(0.22, 0.24, 0.1, 2, 0.04), mat(0xd9a441, { rough: 0.7 }), 0, 0.36, -0.2));
-  // Hands, stretched out front when pushing.
-  for (const x of [-0.2, 0.2]) body.add(mesh(new THREE.SphereGeometry(0.065, 10, 8), skin, x, 0.32, 0.05));
-  // Boots.
-  for (const x of [-0.09, 0.09]) body.add(mesh(new THREE.SphereGeometry(0.08, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat(0x5a3a22), x, 0, 0.02));
-  return { group: g, body, suit, cap };
+  brim.computeVertexNormals();
+  body.add(
+    mesh(
+      merge([
+        plain(new THREE.SphereGeometry(0.2, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.71, 0)),
+        plain(brim.translate(0, 0.725, 0.11)),
+        plain(new THREE.SphereGeometry(0.03, 8, 6).translate(0, 0.91, 0)),
+      ]),
+      cap,
+    ),
+  );
+  const face: THREE.BufferGeometry[] = [
+    paint(new THREE.SphereGeometry(0.19, 18, 14).translate(0, 0.67, 0), skinColor),
+    // A nose, a belt with a buckle, a little backpack with a strap.
+    paint(new THREE.SphereGeometry(0.035, 10, 8).translate(0, 0.625, 0.19), 0xf0b48a),
+    paint(new THREE.TorusGeometry(0.196, 0.025, 6, 22).rotateX(Math.PI / 2).translate(0, 0.3, 0), 0x5a3a22),
+    paint(new RoundedBoxGeometry(0.07, 0.05, 0.02, 1, 0.008).translate(0, 0.3, 0.215), 0xe8c060),
+    paint(new RoundedBoxGeometry(0.22, 0.24, 0.1, 2, 0.04).translate(0, 0.38, -0.2), 0xd9a441),
+    paint(new RoundedBoxGeometry(0.16, 0.06, 0.03, 1, 0.01).translate(0, 0.43, -0.255), 0xb8862f),
+  ];
+  const shine: THREE.BufferGeometry[] = [];
+  for (const x of [-0.07, 0.07]) {
+    // Eyes with a glint, rosy cheeks.
+    face.push(paint(new THREE.SphereGeometry(0.045, 12, 10).scale(1, 1.15, 0.8).translate(x, 0.665, 0.165), 0xffffff));
+    face.push(paint(new THREE.SphereGeometry(0.026, 10, 8).translate(x, 0.665, 0.198), 0x1a1a24));
+    face.push(paint(new THREE.SphereGeometry(0.03, 8, 6).translate(x * 1.57, 0.6, 0.15), 0xff9c8a));
+    shine.push(plain(new THREE.SphereGeometry(0.009, 6, 4).translate(x + 0.01, 0.678, 0.221)));
+  }
+  body.add(mesh(merge(face), mat(0xffffff, { rough: 0.6, vertexColors: true })));
+  const glint = mesh(merge(shine), mat(0xffffff, { emissive: 0xffffff, emissiveIntensity: 1, rough: 0.2 }));
+  glint.castShadow = false;
+  body.add(glint);
+  // Arms: a sleeve and a hand, hanging from the shoulder pivot.
+  const arms: THREE.Group[] = [];
+  const sleeve = new THREE.CapsuleGeometry(0.048, 0.12, 3, 8).translate(0, -0.08, 0);
+  const hand = new THREE.SphereGeometry(0.058, 10, 8).translate(0, -0.19, 0);
+  for (const x of [-0.215, 0.215]) {
+    const a = new THREE.Group();
+    a.position.set(x, 0.47, 0.01);
+    a.add(mesh(sleeve, suit), mesh(hand, skin));
+    a.rotation.z = x < 0 ? -0.18 : 0.18;
+    body.add(a);
+    arms.push(a);
+  }
+  // Legs: short ones with round boots.
+  const legs: THREE.Group[] = [];
+  const leg = new THREE.CylinderGeometry(0.05, 0.05, 0.1, 8).translate(0, -0.05, 0);
+  const bootGeo = new THREE.SphereGeometry(0.075, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.9, 1.25).translate(0, -0.15, 0.02);
+  for (const x of [-0.085, 0.085]) {
+    const l = new THREE.Group();
+    l.position.set(x, 0.15, 0);
+    l.add(mesh(leg, suit), mesh(bootGeo, boot));
+    body.add(l);
+    legs.push(l);
+  }
+  return { group: g, body, suit, cap, arms, legs };
 }
 
-/** A goal pad: a glowing ring set in the floor. The ring's material pulses when uncovered. */
-export function goalModel(b: Biome): { group: THREE.Group; glow: THREE.MeshStandardMaterial } {
+/**
+ * A goal pad: a beveled frame set in the floor around a glowing groove, four corner ticks,
+ * and a soft column of light while it's uncovered. The groove's material pulses.
+ */
+export function goalModel(b: Biome): { group: THREE.Group; glow: THREE.MeshStandardMaterial; column: THREE.MeshBasicMaterial } {
   const g = new THREE.Group();
-  const glow = new THREE.MeshStandardMaterial({ color: b.goal, emissive: b.goal, emissiveIntensity: 0.6, roughness: 0.4 });
-  const ring = mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 28), glow, 0, 0.02, 0);
-  ring.rotation.x = -Math.PI / 2;
-  ring.castShadow = false;
-  const disc = mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.02, 24), mat(b.goal, { rough: 0.5, emissive: b.goal, emissiveIntensity: 0.15 }), 0, 0.01, 0);
-  disc.castShadow = false;
-  g.add(ring, disc);
-  return { group: g, glow };
+  const glow = owned(new THREE.MeshStandardMaterial({ color: b.goal, emissive: b.goal, emissiveIntensity: 0.6, roughness: 0.4 }));
+  const frameColor = new THREE.Color(b.ground).lerp(new THREE.Color(0x2a2630), 0.45).getHex();
+  // The frame: a low beveled ring sloping into the groove (a lathe profile).
+  const prof = [
+    [0.43, 0.0],
+    [0.415, 0.03],
+    [0.37, 0.04],
+    [0.34, 0.025],
+    [0.32, 0.004],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  // The frame and the floor of the pad: one vertex-colored mesh.
+  const base = mesh(
+    merge([paint(new THREE.LatheGeometry(prof, 32), frameColor), paint(new THREE.CircleGeometry(0.245, 28).rotateX(-Math.PI / 2).translate(0, 0.005, 0), new THREE.Color(b.goal).lerp(new THREE.Color(0xffffff), 0.15))]),
+    mat(0xffffff, { rough: 0.55, metal: 0.1, vertexColors: true }),
+  );
+  base.castShadow = false;
+  // The groove and four corner ticks (little L marks in the cell's corners) glow together.
+  const lit: THREE.BufferGeometry[] = [plain(new THREE.RingGeometry(0.24, 0.325, 32).rotateX(-Math.PI / 2).translate(0, 0.008, 0))];
+  for (let k = 0; k < 4; k++) {
+    const m = new THREE.Matrix4().makeRotationY((k * Math.PI) / 2);
+    lit.push(plain(new THREE.BoxGeometry(0.11, 0.012, 0.03).translate(0.355, 0.006, 0.4)).applyMatrix4(m));
+    lit.push(plain(new THREE.BoxGeometry(0.03, 0.012, 0.11).translate(0.4, 0.006, 0.355)).applyMatrix4(m));
+  }
+  const glowing = mesh(merge(lit), glow);
+  glowing.castShadow = false;
+  // The column: an additive, fading cylinder (hidden from shadows and the AO pass).
+  const column = owned(glowMaterial(b.goal, 0.3, fadeTexture()));
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.33, 1.3, 24, 1, true).translate(0, 0.65, 0), column);
+  col.renderOrder = 4;
+  col.name = 'column';
+  g.add(base, glowing, col);
+  return { group: g, glow, column };
 }
 
 /** A wall block, in the biome's style (seeded by its cell, so each one differs a little). */
@@ -140,8 +309,30 @@ export function wallModel(b: Biome, seed: number): THREE.Object3D {
     }
     case 'ice': {
       // A faceted block of blue ice under a soft cap of snow, with a few icicles.
+      // Chipped ice: lighter toward the middle of each face (a clear core), darker at the edges.
       const ice = mat(b.wallColor, { rough: 0.12, metal: 0.05, flat: true });
-      g.add(mesh(roughen(new THREE.BoxGeometry(0.92, 0.7, 0.92, 2, 2, 2), 0.07, r, true), ice, 0, 0.35, 0));
+      const block = roughen(new THREE.BoxGeometry(0.92, 0.7, 0.92, 2, 2, 2), 0.08, r, true);
+      const bp = block.attributes.position;
+      const core = new THREE.Color(b.wallColor).lerp(new THREE.Color(0xf0faff), 0.35);
+      const rim = new THREE.Color(b.wallColor).multiplyScalar(0.72);
+      const col = new Float32Array(bp.count * 3);
+      const c = new THREE.Color();
+      for (let k = 0; k < bp.count; k++) {
+        const t = (bp.getX(k) / 0.46) ** 2 + (bp.getY(k) / 0.35) ** 2 + (bp.getZ(k) / 0.46) ** 2;
+        c.copy(core).lerp(rim, Math.min(1, Math.max(0, (t - 1) / 2)));
+        col.set([c.r, c.g, c.b], k * 3);
+      }
+      block.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      g.add(mesh(block, mat(0xffffff, { rough: 0.1, metal: 0.05, flat: true, vertexColors: true, emissive: 0x2f6f9a, emissiveIntensity: 0.22 })));
+      g.children[g.children.length - 1].position.y = 0.35;
+      // Broken-off chips at the foot of the block.
+      const chip = mat(0xcdeeff, { rough: 0.08, flat: true, emissive: 0x3f8fc0, emissiveIntensity: 0.2 });
+      for (let k = 0; k < 2; k++) {
+        const a = r() * Math.PI * 2;
+        const m = mesh(roughen(new THREE.OctahedronGeometry(0.07 + r() * 0.04, 0), 0.03, r), chip, Math.cos(a) * 0.5, 0.04, Math.sin(a) * 0.5);
+        m.rotation.set(r(), r() * 3, r());
+        g.add(m);
+      }
       // The cap leaves a rim of ice showing, so walls stand out from the snowy floor.
       const snow = mesh(roughen(new RoundedBoxGeometry(0.7, 0.12, 0.7, 2, 0.06), 0.06, r), mat(b.wallTop, { rough: 0.95 }), (r() - 0.5) * 0.08, 0.72, (r() - 0.5) * 0.08);
       g.add(snow);
@@ -219,10 +410,19 @@ export function wallModel(b: Biome, seed: number): THREE.Object3D {
       g.add(mesh(new RoundedBoxGeometry(0.96, 0.66, 0.96, 1, 0.05), iron, 0, 0.33, 0));
       g.add(mesh(new RoundedBoxGeometry(1, 0.07, 1, 1, 0.02), brass, 0, 0.5, 0));
       g.add(mesh(new RoundedBoxGeometry(1, 0.06, 1, 1, 0.02), brass, 0, 0.05, 0));
-      const rivet = new THREE.SphereGeometry(0.035, 6, 4);
+      // A riveted panel on each side, set in a dark groove.
+      const groove = mat(0x1c1714, { rough: 0.8, metal: 0.3 });
+      const plate = mat(b.wallTop, { rough: 0.5, metal: 0.5 });
+      const rivet = new THREE.CylinderGeometry(0.022, 0.027, 0.02, 6).rotateX(Math.PI / 2);
+      const frameGeo = new THREE.BoxGeometry(0.74, 0.34, 0.01);
+      const plateGeo = new RoundedBoxGeometry(0.68, 0.28, 0.03, 1, 0.01);
       for (let k = 0; k < 4; k++) {
-        const a = (k / 4) * Math.PI * 2 + Math.PI / 4;
-        g.add(mesh(rivet, brass, Math.cos(a) * 0.62, 0.36, Math.sin(a) * 0.62));
+        const side = new THREE.Group();
+        side.rotation.y = (k * Math.PI) / 2;
+        side.add(mesh(frameGeo, groove, 0, 0.26, 0.481));
+        side.add(mesh(plateGeo, plate, 0, 0.26, 0.488));
+        for (const x of [-0.29, 0.29]) for (const y of [0.15, 0.37]) side.add(mesh(rivet, brass, x, y, 0.508));
+        g.add(side);
       }
       const gear = mesh(gearGeometry(0.28, 0.04, 9), mat(0xe0b45a, { rough: 0.3, metal: 0.8 }), 0, 0.67, 0);
       gear.rotation.y = r() * 3;
@@ -429,9 +629,9 @@ export function decorModel(kind: DecorKind, b: Biome, r: () => number): THREE.Ob
       const speed = (r() < 0.5 ? -1 : 1) * (0.4 + r() * 0.3);
       const pair: [number, number, number, THREE.Material, number][] = [[0, 0, 0.3, brass, speed], [0.4, 0.12, 0.17, copper, (-speed * 0.3) / 0.17]];
       for (const [x, z, rad, m, sp] of pair) {
-        const wheel = new THREE.Group();
-        wheel.add(mesh(gearGeometry(rad, 0.06, Math.round(rad * 34)), m));
-        wheel.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 8), pin));
+        // One mesh per wheel (it turns): the gear and its dark pin, vertex-colored.
+        const tone = (m as THREE.MeshStandardMaterial).color.getHex();
+        const wheel = mesh(merge([paint(gearGeometry(rad, 0.06, Math.round(rad * 34)), tone), paint(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 8), pin.color)]), mat(0xffffff, { metal: 0.7, rough: 0.38, vertexColors: true }));
         wheel.position.set(x, 0.05, z);
         wheel.rotation.y = r() * 3;
         wheel.userData = { live: true, spin: sp };
@@ -455,4 +655,4 @@ export function decorModel(kind: DecorKind, b: Biome, r: () => number): THREE.Ob
 }
 
 /** Rounded floor tile geometry (shared). */
-export const tileGeometry = new RoundedBoxGeometry(1, 0.3, 1, 1, 0.06);
+export const tileGeometry = shared(new RoundedBoxGeometry(1, 0.3, 1, 1, 0.06));

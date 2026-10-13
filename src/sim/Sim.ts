@@ -190,16 +190,20 @@ export function worldOf(g: Grid, b: Int16Array): World {
   for (const r of lit) on[g.param[r]] = true;
   const open: number[] = [];
   const raised: number[] = [];
-  for (let c = 0; c < g.tile.length; c++) {
-    const t = g.tile[c];
-    if (t === TILE.door && (on[g.param[c]] || occupied(b, c))) open.push(c);
-    if ((t === TILE.gateEven || t === TILE.gateOdd) && gateUp(g, b[S.moves], c) && !occupied(b, c)) raised.push(c);
-  }
+  for (const c of g.doors) if (on[g.param[c]] || occupied(b, c)) open.push(c);
+  for (const c of g.gateCells) if (gateUp(g, b[S.moves], c) && !occupied(b, c)) raised.push(c);
   return { on, lit, beams, open, raised };
 }
 
+/** The channels on, which is all a move needs of the world (only plates and receivers switch them). */
+const NONE_ON: readonly boolean[] = [false, false, false, false];
+const channelsOn = (g: Grid, b: Int16Array): readonly boolean[] => (g.plates.length || g.receivers.length ? worldOf(g, b).on : NONE_ON);
+
+/** The largest move (and push) count an Int16 holds: past it the move count steps back by one, so its parity (the gates) stays right. */
+const MAX_MOVES = 32767;
+
 /** Something can't enter this cell at all (walls, emitters, receivers, closed doors, raised gates). */
-function blocked(g: Grid, b: Int16Array, on: boolean[], cell: number) {
+function blocked(g: Grid, b: Int16Array, on: readonly boolean[], cell: number) {
   if (cell < 0 || g.wall[cell]) return true;
   const t = g.tile[cell];
   if (t === TILE.emitter || t === TILE.receiver) return true;
@@ -226,9 +230,10 @@ const isWon = (g: Grid, b: Int16Array) => g.goals.every((c) => covered(g, b, c))
 
 /**
  * Moves crate k into `cell` (where it falls to the surface), then lets it slide on across
- * ice and come out of a teleporter. Returns the events.
+ * ice and come out of a teleporter. `dest` is the cell the player is stepping into (or -1):
+ * the crate never slides or teleports there. Returns the events.
  */
-function placeCrate(g: Grid, b: Int16Array, on: boolean[], k: number, cell: number, dir: number, slide: boolean): number {
+function placeCrate(g: Grid, b: Int16Array, on: readonly boolean[], k: number, cell: number, dir: number, slide: boolean, dest: number): number {
   const i = HEAD + k * 2;
   let ev = 0;
   for (let n = 0; n < g.w * g.h; n++) {
@@ -246,7 +251,7 @@ function placeCrate(g: Grid, b: Int16Array, on: boolean[], k: number, cell: numb
     if (!slide || g.tile[cell] !== TILE.ice || land !== g.floor[cell]) break;
     // On ice: on to the next cell, if there's room at this level.
     const next = neighbour(g, cell, dir);
-    if (next < 0 || blocked(g, b, on, next) || b[S.cell] === next) break;
+    if (next < 0 || blocked(g, b, on, next) || b[S.cell] === next || next === dest) break;
     if (g.floor[next] !== VOID && surface(g, b, next) > land) break;
     ev |= EVENT.slide;
     cell = next;
@@ -255,7 +260,7 @@ function placeCrate(g: Grid, b: Int16Array, on: boolean[], k: number, cell: numb
   const z = b[i + 1];
   if (g.tile[pad] === TILE.teleport && z === g.floor[pad]) {
     const out = g.partner[pad];
-    if (out >= 0 && !occupied(b, out) && !blocked(g, b, on, out)) {
+    if (out >= 0 && out !== dest && !occupied(b, out) && !blocked(g, b, on, out)) {
       b[i] = out;
       b[i + 1] = g.floor[out];
       ev |= EVENT.teleport;
@@ -265,7 +270,7 @@ function placeCrate(g: Grid, b: Int16Array, on: boolean[], k: number, cell: numb
 }
 
 /** The player slides across ice (stopping before anything in the way), then may teleport. */
-function settlePlayer(g: Grid, b: Int16Array, on: boolean[], dir: number): number {
+function settlePlayer(g: Grid, b: Int16Array, on: readonly boolean[], dir: number): number {
   let ev = 0;
   for (let n = 0; n < g.w * g.h; n++) {
     const cell = b[S.cell];
@@ -279,20 +284,22 @@ function settlePlayer(g: Grid, b: Int16Array, on: boolean[], dir: number): numbe
     b[S.z] = s;
     ev |= EVENT.slide;
   }
+  return ev | teleportPlayer(g, b, on);
+}
+
+/** The player standing on a teleporter comes out of its twin, if that is free. */
+function teleportPlayer(g: Grid, b: Int16Array, on: readonly boolean[]): number {
   const pad = b[S.cell];
-  if (g.tile[pad] === TILE.teleport && b[S.z] === g.floor[pad]) {
-    const out = g.partner[pad];
-    if (out >= 0 && !occupied(b, out) && !blocked(g, b, on, out)) {
-      b[S.cell] = out;
-      b[S.z] = g.floor[out];
-      ev |= EVENT.teleport;
-    }
-  }
-  return ev;
+  if (g.tile[pad] !== TILE.teleport || b[S.z] !== g.floor[pad]) return 0;
+  const out = g.partner[pad];
+  if (out < 0 || occupied(b, out) || blocked(g, b, on, out)) return 0;
+  b[S.cell] = out;
+  b[S.z] = g.floor[out];
+  return EVENT.teleport;
 }
 
 /** Conveyors carry what stands on them one cell, each thing at most once a move. */
-function convey(g: Grid, b: Int16Array, on: boolean[]): number {
+function convey(g: Grid, b: Int16Array, on: readonly boolean[]): number {
   if (g.conveyors.length === 0) return 0;
   let ev = 0;
   const moved = new Set<number>();
@@ -311,14 +318,14 @@ function convey(g: Grid, b: Int16Array, on: boolean[]): number {
         b[S.z] = s;
         moved.add(-1);
         changed = true;
-        ev |= EVENT.convey;
+        ev |= EVENT.convey | teleportPlayer(g, b, on);
         continue;
       }
       const k = crateAt(b, c, z);
       // Never from under the player or another crate, never into the player.
       if (k < 0 || moved.has(k) || crateAt(b, c, z + 1) >= 0 || b[S.cell] === c || b[S.cell] === to) continue;
       if (g.floor[to] !== VOID && surface(g, b, to) > z) continue;
-      ev |= placeCrate(g, b, on, k, to, dir, false) | EVENT.convey;
+      ev |= placeCrate(g, b, on, k, to, dir, false, -1) | EVENT.convey;
       moved.add(k);
       changed = true;
     }
@@ -328,8 +335,7 @@ function convey(g: Grid, b: Int16Array, on: boolean[]): number {
 
 /** One move. Returns the new state, or null when the move is blocked (nothing changes). */
 export function step(g: Grid, prev: Int16Array, input: number): Int16Array | null {
-  const before = worldOf(g, prev);
-  const on = before.on;
+  const on = channelsOn(g, prev);
   const from = prev[S.cell];
   const e = prev[S.z];
   const pulling = input >= 4;
@@ -348,9 +354,9 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
     if (k < 0 || crateAt(b, back, e + 1) >= 0 || crate >= 0 || isHole(g, b, to) || surface(g, b, to) !== e) return null;
     b[S.cell] = to;
     b[S.z] = e;
-    b[S.pushes]++;
+    b[S.pushes] = Math.min(MAX_MOVES, b[S.pushes] + 1);
     b[S.pushed] = k;
-    ev |= EVENT.pull | placeCrate(g, b, on, k, from, dir, true);
+    ev |= EVENT.pull | placeCrate(g, b, on, k, from, dir, true, to);
   } else if (crate >= 0) {
     if (g.pull) return null;
     // A push: nothing on top of the crate, and room for it at this level beyond.
@@ -358,9 +364,9 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
     const beyond = neighbour(g, to, dir);
     if (beyond < 0 || blocked(g, b, on, beyond)) return null;
     if (g.floor[beyond] !== VOID && surface(g, b, beyond) > e) return null;
-    b[S.pushes]++;
+    b[S.pushes] = Math.min(MAX_MOVES, b[S.pushes] + 1);
     b[S.pushed] = crate;
-    ev |= EVENT.push | placeCrate(g, b, on, crate, beyond, dir, true);
+    ev |= EVENT.push | placeCrate(g, b, on, crate, beyond, dir, true, to);
   } else {
     const s = surface(g, b, to);
     if (Math.abs(s - e) > 1 || isHole(g, b, to)) return null;
@@ -372,7 +378,7 @@ export function step(g: Grid, prev: Int16Array, input: number): Int16Array | nul
   ev |= settlePlayer(g, b, on, dir);
   // Pulling, the pusher walks backwards, facing the crate.
   b[S.facing] = pulling ? (dir + 2) % 4 : dir;
-  b[S.moves]++;
+  b[S.moves] = prev[S.moves] >= MAX_MOVES ? MAX_MOVES - 1 : prev[S.moves] + 1;
   ev |= convey(g, b, on) | EVENT.step;
   for (const c of g.goals) {
     const was = covered(g, prev, c);

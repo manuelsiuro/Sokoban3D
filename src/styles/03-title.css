@@ -258,8 +258,9 @@
 /* Footer: the sound switch (always reachable), settings, and the install offer. */
 .title-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 2px 2px 0;
 }
 
@@ -287,20 +288,36 @@
   box-shadow: 0 1px 0 rgba(18, 35, 58, 0.18);
 }
 
-.sound-toggle {
+.sound-toggle,
+.help-btn-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 36px;
-  padding: 0 14px 0 11px;
+  padding: 0 11px 0 9px;
   border-radius: 999px;
   font: 700 12.5px var(--font-ui);
+  white-space: nowrap;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+/* On: a deep green that keeps white text readable; off: a quiet grey with dark text. */
+.sound-toggle {
   color: white;
-  background: linear-gradient(180deg, #34c992, #1b8f63);
+  background: linear-gradient(180deg, #1f9e6e, #137a52);
+  box-shadow: 0 2px 6px rgba(19, 122, 82, 0.3);
 }
 
 .sound-toggle.off {
-  background: linear-gradient(180deg, #a7b4c4, #7d8ca0);
+  color: var(--ink-soft);
+  background: #e4eaf1;
+  box-shadow: inset 0 0 0 1.5px #c9d3df;
+}
+
+.help-btn-title {
+  color: var(--ink);
+  background: white;
+  box-shadow: inset 0 0 0 1.5px #d3dce7, 0 2px 6px rgba(20, 50, 90, 0.08);
 }
 
 .title-version {
@@ -458,4 +475,28 @@ body.touch .keys-hint {
   display: inline-block;
   vertical-align: -4px;
   color: var(--accent);
+}
+
+/* Settings: the gear in the screen's top-right corner, as in most games. */
+.title-settings {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  box-shadow: var(--shadow);
+}
+
+/* Narrow phones: the help button keeps only its icon. */
+@media (max-width: 359px) {
+  .help-btn-title span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .help-btn-title {
+    padding: 0 10px;
+  }
 }

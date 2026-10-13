@@ -44,7 +44,7 @@ if (!TOUCH) {
 }
 
 /** The summary after a solve, with its sounds. */
-export const summary = (r: SummaryInfo) => showSummary(r, click, (k) => sound.star(k));
+export const summary = (r: SummaryInfo) => showSummary({ pulls: screen.sim.grid.pull, ...r }, click, (k) => sound.star(k));
 /** A campaign level's par (its stored solution's length). */
 export const par = (index: number) => SOLUTIONS[LEVELS[index].id]?.length ?? 0;
 

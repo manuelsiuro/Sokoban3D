@@ -1,7 +1,7 @@
 import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
 import type { LevelDef } from '../levels/types';
-import { click, map, newTrophies, par, screen, settings, showLevel, sound, summary, view, worldIndex } from '../app/context';
+import { click, map, newTrophies, par, screen, settings, showLevel, sound, summary, toast, view, worldIndex } from '../app/context';
 import { OPENS_AFTER, isUnlocked, isWorldOpen, saveTime, worldCleared, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
 import { formatTime, medalFor, medalTimes, starLimits, starsFor } from '../game/score';
 import { showWorlds } from '../ui/screens/worlds';
@@ -9,13 +9,16 @@ import { play } from './run';
 import { GRANDS, GRAND_SOLUTIONS } from '../levels/grand';
 import { KEYS as STORE, readJSON, writeJSON } from '../game/storage';
 import { h } from '../ui/dom';
-import { levelText, t } from '../i18n';
+import { levelText, t, type Key } from '../i18n';
+import { icon } from '../ui/icons';
+import { showHelp, worldPicture } from '../ui/screens/help';
 
 /** Before a new world's first level (after the Meadow): a card on what its mechanic does. Once. */
 async function introduce(level: LevelDef) {
   const w = WORLDS.findIndex((x) => x.id === level.world);
   if (w <= 0 || LEVELS.find((l) => l.world === level.world) !== level) return;
-  const seen = readJSON<string[]>(STORE.seen, []);
+  const stored = readJSON<unknown>(STORE.seen, []);
+  const seen = Array.isArray(stored) ? stored.filter((x): x is string => typeof x === 'string') : [];
   if (seen.includes(level.world)) return;
   writeJSON(STORE.seen, [...seen, level.world]);
   // The new world's island is already behind the card.
@@ -26,11 +29,17 @@ async function introduce(level: LevelDef) {
   const el = h(
     'div',
     'modal',
-    `<div class="card intro-card"><p class="intro-kicker">${t('intro.kicker', { n: w + 1 })}</p><h2>${world.name}</h2><p class="intro-mech">${world.mechanic}</p><p class="intro-tip">${levelText(level).tip}</p><div class="actions"><button class="big-btn primary" data-done>${t('intro.go')}</button></div></div>`,
+    `<div class="card intro-card"><p class="intro-kicker">${OPENS_AFTER[world.id] ? t('intro.bonus') : t('intro.kicker', { n: w + 1 })}</p><h2>${world.name}</h2><p class="intro-mech">${world.mechanic}</p><div class="intro-pic">${worldPicture(world.id)}</div><p class="intro-tip">${t(`help.w.${world.id}` as Key)}</p><div class="actions"><button class="big-btn ghost" data-help>${icon('help', 16)} ${t('intro.help')}</button><button class="big-btn primary" data-done>${t('intro.go')}</button></div></div>`,
   );
   document.body.append(el);
   await new Promise<void>((resolve) => {
-    el.onclick = (e) => {
+    el.onclick = async (e) => {
+      if ((e.target as HTMLElement).closest('[data-help]')) {
+        click();
+        const p = loadProgress();
+        await showHelp({ open: new Set(WORLDS.filter((_, k) => isWorldOpen(k, p)).map((x) => x.id)), world: world.id }, click);
+        return;
+      }
       if (!(e.target as HTMLElement).closest('[data-done]')) return;
       click();
       el.remove();
@@ -52,7 +61,10 @@ export async function levelFlow(index: number): Promise<number> {
     const { state: s, clean } = r;
     const p = par(index);
     const stars = starsFor(s.moves, p);
+    const wasCleared = worldCleared(level.world);
     const best = saveResult(level.id, stars, s.moves, clean, r.moves);
+    // The world's last level solved: Time Trial and the Grand Island open for it.
+    if (!wasCleared && worldCleared(level.world)) setTimeout(() => toast(`${icon('clock', 18)} <span>${t('trial.unlocked', { world: WORLDS[worldIndex(index)].name })}</span>`, 6000), 2400);
     const extra = newTrophies();
     // Next stays inside the world; after its last level, back to the map.
     const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === level.world ? index + 1 : -1;

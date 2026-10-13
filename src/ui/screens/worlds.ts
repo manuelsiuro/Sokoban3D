@@ -148,6 +148,12 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       resolve(v);
     };
     const onKey = (e: KeyboardEvent) => {
+      // A dialog on top has the keys; a focused button does its own Enter/Space, and inside
+      // the open level sheet the arrows belong to it, not to the world switch.
+      if (document.querySelector('.modal')) return;
+      const onButton = (e.target as HTMLElement).closest?.('button, select, input');
+      if (onButton && (e.code === 'Enter' || e.code === 'Space')) return;
+      if (onButton && !sheet.classList.contains('hidden') && sheet.contains(onButton) && e.code.startsWith('Arrow')) return;
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') go(k - 1);
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') go(k + 1);
       else if (e.code === 'Enter' || e.code === 'Space') {

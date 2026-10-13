@@ -15,6 +15,7 @@ const ROOMS: Record<string, { size: number; wet: number }> = {
   forge: { size: 1.2, wet: 0.2 },
   crystal: { size: 3.0, wet: 0.34 },
   clockwork: { size: 1.4, wet: 0.2 },
+  reverse: { size: 1.1, wet: 0.16 },
 };
 export class Sound {
   private ctx: AudioContext | null = null;
@@ -58,8 +59,18 @@ export class Sound {
         /* no audio on this device */
       }
     };
-    addEventListener('pointerdown', start, { once: true });
-    addEventListener('keydown', start, { once: true });
+    // Phones may leave the context suspended (or interrupt it after a call): every gesture
+    // wakes it. A hidden page goes quiet, and the music doesn't pile up notes meanwhile.
+    const wake = () => {
+      start();
+      if (this.ctx && this.ctx.state !== 'running' && !document.hidden) this.ctx.resume().catch(() => {});
+    };
+    for (const e of ['pointerdown', 'pointerup', 'keydown', 'touchend']) addEventListener(e, wake);
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend().catch(() => {});
+      else wake();
+    });
   }
 
   /** Background music: on or off, its volume (0..1), and the world whose theme plays. */
@@ -125,6 +136,8 @@ export class Sound {
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f).connect(g).connect(this.out);
+    // Looped, so a long hiss from a random point never runs off the buffer's end.
+    src.loop = true;
     src.start(t, Math.random() * 0.3);
     src.stop(t + dur + 0.02);
   }
@@ -313,6 +326,8 @@ class Music {
   private schedule() {
     const t = this.theme;
     const beatLen = 60 / t.bpm / 2; // eighth notes
+    // Back after a pause (a throttled timer): carry on from now, not with every missed note.
+    if (this.nextAt < this.ctx.currentTime) this.nextAt = this.ctx.currentTime + 0.05;
     while (this.nextAt < this.ctx.currentTime + 0.3) {
       const at = this.nextAt;
       const bar = Math.floor(this.beat / 8);

@@ -1,5 +1,6 @@
 import { en, type Strings } from './en';
 import { fr } from './fr';
+import { withKeys } from './keys';
 
 /**
  * Translations. `t('key', { n: 3 })` looks the key up in the current language (falling back
@@ -15,7 +16,8 @@ let lang: Lang = 'en';
 export const detectLang = (): Lang => (navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en');
 
 export function setLang(l: Lang | 'auto') {
-  lang = l === 'auto' ? detectLang() : l;
+  // An unknown stored value falls back to the browser's language.
+  lang = l === 'en' || l === 'fr' ? l : detectLang();
   document.documentElement.lang = lang;
   // The game speaks French itself: the browser shouldn't translate it again. English pages
   // stay translatable for players of other languages.
@@ -25,8 +27,8 @@ export function setLang(l: Lang | 'auto') {
 export const currentLang = () => lang;
 
 export function t(key: Key, vars: Record<string, string | number> = {}): string {
-  const s = TABLES[lang][key] ?? en[key];
-  return s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
+  const s = TABLES[lang]?.[key] ?? en[key];
+  return withKeys(s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`)));
 }
 
 /** A level's name and tip in the current language (the level's own text when untranslated). */

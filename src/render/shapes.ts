@@ -40,56 +40,84 @@ export function roughen(geo: THREE.BufferGeometry, amount: number, r: R, keepBot
 }
 
 /**
- * A cumulus cloud: overlapping smooth puffs, big in the middle and smaller at the ends,
- * with a flat underside, shaded from a white top to a tinted belly (vertex colors).
+ * A cumulus cloud: a flat-bottomed base of wide puffs with bigger ones heaped in the middle.
+ * The normals lean toward the whole cloud's outline, so it shades as one soft volume with
+ * bumps rather than a cluster of balls, and the creases where puffs meet are darker
+ * (vertex colors, from a white top to a tinted belly).
  */
 export function cloudGeometry(r: R, opts: { length?: number; height?: number; depth?: number; puffs?: number; top?: number; belly?: number } = {}) {
   const len = opts.length ?? 2;
   const height = opts.height ?? 0.9;
   const depth = opts.depth ?? 1;
-  const n = opts.puffs ?? 5;
-  const parts: THREE.BufferGeometry[] = [];
+  const n = Math.max(2, opts.puffs ?? 5);
+  const puffs: { x: number; y: number; z: number; rad: number }[] = [];
+  // The base: puffs along the length, close enough to overlap well, staggered front and back.
   for (let k = 0; k < n; k++) {
-    const t = n === 1 ? 0.5 : k / (n - 1);
-    // Biggest in the middle.
-    const size = (0.55 + Math.sin(t * Math.PI) * 0.45) * (0.85 + r() * 0.3);
-    const rad = (height * 0.62) * size;
-    const s = new THREE.IcosahedronGeometry(rad, 2);
-    s.translate((t - 0.5) * len, rad * 0.35 + r() * height * 0.15, (r() - 0.5) * depth * 0.5);
-    parts.push(s);
+    const t = k / (n - 1);
+    const rad = height * (0.42 + Math.sin(t * Math.PI) * 0.22) * (0.85 + r() * 0.3);
+    puffs.push({ x: (t - 0.5) * len * 0.82, y: rad * 0.2, z: (k % 2 ? 1 : -1) * depth * (0.12 + r() * 0.12), rad });
   }
-  // A second row of small puffs, so it isn't a string of beads.
+  // The heap: one to three big puffs on top, toward the middle.
+  const heap = n >= 4 ? 2 + (r() < 0.5 ? 1 : 0) : 1;
+  for (let k = 0; k < heap; k++) {
+    const rad = height * (0.5 + r() * 0.18);
+    puffs.push({ x: (r() - 0.5) * len * 0.42, y: height * (0.38 + r() * 0.14), z: (r() - 0.5) * depth * 0.3, rad });
+  }
+  // Small puffs on the sides, so the outline isn't a row of beads.
   for (let k = 0; k < Math.max(1, n - 2); k++) {
-    const rad = height * (0.28 + r() * 0.16);
-    const s = new THREE.IcosahedronGeometry(rad, 2);
-    s.translate((r() - 0.5) * len * 0.8, rad * 0.3, (r() < 0.5 ? -1 : 1) * depth * (0.25 + r() * 0.15));
-    parts.push(s);
+    const rad = height * (0.26 + r() * 0.12);
+    puffs.push({ x: (r() - 0.5) * len * 0.8, y: rad * 0.15, z: (r() < 0.5 ? -1 : 1) * depth * (0.32 + r() * 0.1), rad });
   }
-  const geo = mergeGeometries(parts.map((p) => plain(p)));
-  // A flat belly: everything below the base is squashed onto it.
+  const parts = puffs.map((q) => {
+    const s = new THREE.IcosahedronGeometry(q.rad, 2);
+    // Puffs a little wider than tall.
+    s.scale(1.12, 0.9, 1.05);
+    s.translate(q.x, q.y, q.z);
+    return plain(s);
+  });
+  const geo = mergeGeometries(parts);
+  for (const s of parts) s.dispose();
   const p = geo.attributes.position;
   const nrm = geo.attributes.normal;
   const colors = new Float32Array(p.count * 3);
   const top = new THREE.Color(opts.top ?? 0xffffff);
   const belly = new THREE.Color(opts.belly ?? 0xc9d3e8);
   const c = new THREE.Color();
+  const v = new THREE.Vector3();
+  const blob = new THREE.Vector3();
   let maxY = 0;
   for (let k = 0; k < p.count; k++) maxY = Math.max(maxY, p.getY(k));
+  // The whole cloud's half sizes, for the outline normal.
+  const hx = len * 0.55;
+  const hy = maxY * 0.9;
+  const hz = depth * 0.6;
   for (let k = 0; k < p.count; k++) {
     let y = p.getY(k);
-    if (y < 0) {
+    const flat = y < 0;
+    if (flat) {
+      // A flat belly: everything below the base is squashed onto it.
       y *= 0.08;
       p.setY(k, y);
-      // Facing down now.
-      nrm.setXYZ(k, nrm.getX(k) * 0.3, -1, nrm.getZ(k) * 0.3);
     }
-    const t = Math.min(1, Math.max(0, y / (maxY * 0.75)));
-    c.copy(belly).lerp(top, Math.sqrt(t));
+    v.set(p.getX(k), y, p.getZ(k));
+    if (flat) nrm.setXYZ(k, nrm.getX(k) * 0.25, -1, nrm.getZ(k) * 0.25);
+    else {
+      blob.set(v.x / (hx * hx), Math.max(0, v.y) / (hy * hy), v.z / (hz * hz)).normalize();
+      blob.lerp(new THREE.Vector3(nrm.getX(k), nrm.getY(k), nrm.getZ(k)), 0.45).normalize();
+      nrm.setXYZ(k, blob.x, blob.y, blob.z);
+    }
+    // Creases: a point inside other puffs (near where they meet) is in their shade.
+    let crease = 0;
+    for (const q of puffs) {
+      const d = Math.hypot((v.x - q.x) / 1.12, (v.y - q.y) / 0.9, (v.z - q.z) / 1.05) / q.rad;
+      if (d < 0.995) crease += 1 - d;
+    }
+    const t = Math.min(1, Math.max(0, y / (maxY * 0.8)));
+    c.copy(belly).lerp(top, Math.sqrt(t)).multiplyScalar(1 - Math.min(0.22, crease * 1.6));
     colors.set([c.r, c.g, c.b], k * 3);
   }
   nrm.needsUpdate = true;
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  for (const s of parts) s.dispose();
   return geo;
 }
 
