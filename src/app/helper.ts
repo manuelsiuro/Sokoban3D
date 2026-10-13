@@ -1,5 +1,6 @@
 import type { LevelDef } from '../levels/types';
 import type { Daily } from '../game/daily';
+import type { Floor } from '../game/expedition';
 
 /** Promise-shaped calls to the worker (src/app/worker.ts). */
 let worker: Worker | null = null;
@@ -25,3 +26,17 @@ function call<T>(msg: Record<string, unknown>): Promise<T> {
 export const hint = (level: LevelDef, raw: Int16Array) => call<{ solution: string | null; complete: boolean }>({ type: 'hint', level, raw: [...raw] });
 
 export const generateDaily = (date: string) => call<Daily | null>({ type: 'daily', date });
+
+/** An Expedition floor; asking again for the same one returns the same promise (prefetch). */
+const floors = new Map<string, Promise<Floor | null>>();
+export function generateFloor(seed: number, depth: number) {
+  const key = `${seed}:${depth}`;
+  let p = floors.get(key);
+  if (!p) {
+    p = call<Floor | null>({ type: 'floor', seed, depth });
+    floors.set(key, p);
+    // Keep only the last few.
+    if (floors.size > 4) floors.delete(floors.keys().next().value!);
+  }
+  return p;
+}

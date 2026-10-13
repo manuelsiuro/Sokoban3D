@@ -15,7 +15,7 @@ const LOGO = `<svg class="logo-crate" viewBox="0 0 160 150" aria-hidden="true">
   <path d="M30 47 L80 22" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
 </svg>`;
 
-export type TitleChoice = 'play' | 'worlds' | 'daily' | 'workshop' | 'trophies' | 'settings' | 'install';
+export type TitleChoice = 'play' | 'worlds' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install';
 
 export interface TitleInfo {
   stars: number;
@@ -33,6 +33,8 @@ export interface TitleInfo {
   muted: boolean;
   /** Flips sound on or off; returns whether it's now muted. */
   toggleSound: () => boolean;
+  /** Expedition: open once the Meadow is cleared; the run in progress, if any. */
+  expedition: { open: boolean; run: { depth: number; score: number } | null };
 }
 
 /**
@@ -60,11 +62,17 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           <span class="menu-text"><span class="menu-label">${t('title.worlds')}</span><small>${t('title.worldsSub', { open: info.worldsOpen, worlds: info.worlds, solved: info.solved, levels: info.levels })}</small></span>
           ${icon('chevronRight', 16)}<i class="menu-bar"></i>
         </button>
-        <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
-          <span class="menu-ic">${icon('star', 18)}</span>
-          <span class="menu-text"><span class="menu-label">${t('title.daily')}</span><small>${info.daily.stars ? t('title.dailySolved', { stars: '★'.repeat(info.daily.stars) }) : t('title.dailyNew')}${info.daily.streak ? t('title.streak', { n: info.daily.streak }) : ''}</small></span>
-          ${icon('chevronRight', 16)}<i class="menu-bar"></i>
-        </button>
+        <div class="menu-pair">
+          <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
+            <span class="menu-ic">${icon('star', 18)}</span>
+            <span class="menu-text"><span class="menu-label">${t('title.daily')}</span><small>${info.daily.stars ? t('title.dailySolved', { stars: '★'.repeat(info.daily.stars) }) : t('title.dailyNew')}${info.daily.streak ? t('title.streak', { n: info.daily.streak }) : ''}</small></span>
+            <i class="menu-bar"></i>
+          </button>
+          <button class="menu-btn ${info.expedition.open ? '' : 'locked'}" data-c="expedition" style="--tone:#2fb8a8;--tone-2:#1f8a80;--done:0%" ${info.expedition.open ? '' : 'disabled'}>
+            <span class="menu-ic">${icon(info.expedition.open ? 'compass' : 'lock', 18)}</span>
+            <span class="menu-text"><span class="menu-label">${t('title.expedition')}</span><small>${!info.expedition.open ? t('title.expLocked') : info.expedition.run ? t('title.expRun', { n: info.expedition.run.depth + 1, score: info.expedition.run.score }) : t('title.expNew')}</small></span>
+          </button>
+        </div>
         <div class="menu-pair">
           <button class="menu-btn" data-c="workshop" style="--tone:#7466f0;--tone-2:#4f3fd1;--done:0%">
             <span class="menu-ic">${icon('hammer', 18)}</span>

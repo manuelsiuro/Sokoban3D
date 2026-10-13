@@ -24,12 +24,17 @@ import { levelFlow, worldsFlow } from './modes/campaign';
 import { dailyFlow } from './modes/daily';
 import { sharedFlow } from './modes/shared';
 import { workshopFlow } from './modes/workshop';
+import { expeditionFlow } from './modes/expedition';
+import { loadExpedition } from './game/expedition';
 
 /**
  * Wiring: storage first (app/boot), the long-lived objects (app/context), then the title
  * and the flows between screens (modes/). Screens are functions that resolve with the
  * player's choice, so each flow reads as a script (title → levels → play → summary → …).
  */
+/** Expedition opens once every Meadow level is solved. */
+const expeditionOpen = (p: ReturnType<typeof loadProgress>) => worldLevels('meadow').every(({ l }) => (p[l.id]?.stars ?? 0) > 0);
+
 showLevel(LEVELS[nextLevel() ?? 0]);
 applyLook();
 /** The quality the view runs at (changing any other setting leaves the auto tier alone). */
@@ -65,6 +70,7 @@ async function titleFlow() {
         fresh: Object.keys(p).length === 0,
         muted: settings.muted,
         daily: { streak: currentStreak(date), stars: loadDaily().results[date]?.stars ?? 0 },
+        expedition: { open: expeditionOpen(p), run: loadExpedition().run },
         trophies: { have: have.size, total: ACHIEVEMENTS.length },
         toggleSound: () => {
           settings.muted = !settings.muted;
@@ -78,6 +84,7 @@ async function titleFlow() {
     if (choice === 'play') await levelFlow(next ?? 0);
     else if (choice === 'worlds') await worldsFlow(next === null ? 0 : worldIndex(next));
     else if (choice === 'daily') await dailyFlow();
+    else if (choice === 'expedition') await expeditionFlow();
     else if (choice === 'workshop') await workshopFlow();
     else if (choice === 'install') {
       if (installKind() === 'prompt') await promptInstall();
@@ -117,10 +124,13 @@ async function titleFlow() {
 }
 
 // A share link (#lvl=…) opens that level first; in dev, ?level=<id> opens a campaign level.
+// An expedition link (#exp=<seed>) starts that run.
 const shared = location.hash.startsWith('#lvl=') ? decodeLevel(location.hash.slice(5)) : null;
-if (location.hash.startsWith('#lvl=')) history.replaceState(null, '', location.pathname + location.search);
+const expSeed = /^#exp=(\d{1,10})$/.exec(location.hash)?.[1];
+if (location.hash.startsWith('#lvl=') || expSeed) history.replaceState(null, '', location.pathname + location.search);
 const devLevel = import.meta.env.DEV ? LEVELS.findIndex((l) => l.id === new URLSearchParams(location.search).get('level')) : -1;
 if (shared) sharedFlow(shared.level, shared.par).then(titleFlow);
+else if (expSeed) expeditionFlow(Number(expSeed)).then(titleFlow);
 else if (devLevel >= 0) levelFlow(devLevel).then(titleFlow);
 else titleFlow();
 // Installed app: offline, and a new version found while the game is open is offered once no
@@ -129,5 +139,5 @@ registerServiceWorker((version, restart) => showUpdate(version, restart));
 
 // A share link opened while the game runs (only the hash changed): start over with it.
 addEventListener('hashchange', () => {
-  if (location.hash.startsWith('#lvl=')) location.reload();
+  if (location.hash.startsWith('#lvl=') || location.hash.startsWith('#exp=')) location.reload();
 });

@@ -467,3 +467,59 @@ input:focus-visible + .switch {
   font-weight: 500;
   opacity: 0.6;
 }
+
+/* ------------------------------------------------------------ expedition */
+.hud-skip {
+  position: relative;
+}
+
+.hud-skip.gone {
+  display: none;
+}
+
+.hud-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: white;
+  background: linear-gradient(180deg, #3fd0c0, #1f8a80);
+  box-shadow: 0 2px 6px rgba(15, 80, 75, 0.4);
+}
+
+.exp-card .exp-lead {
+  margin: 4px 0 10px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.exp-best {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0;
+  font-weight: 700;
+  color: #b07a12;
+}
+
+.actions.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.menu-btn.locked {
+  opacity: 0.6;
+  filter: saturate(0.4);
+}
+
+.exp-card .summary-stats {
+  margin: 14px 0 6px;
+}

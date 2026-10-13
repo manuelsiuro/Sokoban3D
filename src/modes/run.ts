@@ -1,4 +1,4 @@
-import { EVENT, type GameState } from '../sim/Sim';
+import { EVENT, inputOf, type GameState } from '../sim/Sim';
 import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
@@ -30,6 +30,7 @@ const hud = h(
      <button class="icon-btn" data-a="undo" data-l="hud.undo">${icon('undo')}</button>
      <button class="icon-btn" data-a="restart" data-l="hud.restart">${icon('replay')}</button>
      <button class="icon-btn" data-a="hint" data-l="hud.hint">${icon('bulb')}</button>
+     <button class="icon-btn hud-skip gone" data-a="skip" data-l="hud.skip">${icon('compass')}<b class="hud-count"></b></button>
      <span class="sep"></span>
      <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
      <button class="icon-btn" data-a="right" data-l="hud.turnRight">${icon('rotateRight')}</button>
@@ -74,6 +75,9 @@ interface Run {
   clean: boolean;
   /** Solved: input is closed while the summary comes. */
   over: boolean;
+  /** Expedition compasses left (undefined: no skipping here); `giveUp`: pressed once with none. */
+  skip?: number;
+  giveUp?: boolean;
   done: (result: RunResult | null) => void;
 }
 export interface RunResult {
@@ -81,6 +85,8 @@ export interface RunResult {
   clean: boolean;
   /** The moves made (LURD). */
   moves: string;
+  /** Left with the Skip button (Expedition), not solved. */
+  skipped?: boolean;
 }
 let run: Run | null = null;
 
@@ -88,7 +94,7 @@ let run: Run | null = null;
  * Plays a level until it's solved; resolves with the final state (null if the player left).
  * `ghost`: a recorded run to show as a ghost; `autoplay`: a run to replay by itself.
  */
-export function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: string; autoplay?: string } = {}): Promise<RunResult | null> {
+export function play(level: LevelDef, label: string, levelPar: number, opts: { ghost?: string; autoplay?: string; skip?: number } = {}): Promise<RunResult | null> {
   showLevel(level);
   screen.mode = 'level';
   view.idle = false;
@@ -98,25 +104,28 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   setText($('.hud-title small'), label);
   setText($('.hud-title b'), text.name);
   tip.textContent = text.tip;
-  tip.classList.remove('gone');
+  // No tip (generated islands): no bubble.
+  tip.classList.toggle('gone', !text.tip);
   clearTimeout(tipTimer);
   tipTimer = window.setTimeout(() => tip.classList.add('gone'), 9000);
   hud.classList.remove('hidden');
   return new Promise((resolve) => {
     const ghost = settings.ghost && opts.ghost && !opts.autoplay && runSolves(level, opts.ghost) ? ghostPath(level, opts.ghost) : null;
     document.body.classList.add('is-playing');
-    run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve };
+    run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip };
+    $('.hud-skip').classList.toggle('gone', opts.skip === undefined);
+    setText($('.hud-count'), String(opts.skip ?? ''));
     hud.classList.toggle('watching', !!opts.autoplay);
     if (opts.autoplay) {
       // A replay: one move every quarter second, through the same rules and animations.
-      const moves = opts.autoplay.toLowerCase();
+      const moves = opts.autoplay;
       let k = 0;
       const r = run;
       say(t('hud.replay'), 4000);
       r.timer = window.setInterval(() => {
         if (run !== r || r.over || k >= moves.length) return clearInterval(r.timer);
         const prev = screen.shown;
-        if (screen.sim.move(DIRS.indexOf(moves[k++]))) present(prev, true);
+        if (screen.sim.move(inputOf(screen.sim.grid, moves[k++]))) present(prev, true);
       }, 260);
     }
     updateHud();
@@ -125,7 +134,7 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   });
 }
 
-function endRun(state: GameState | null) {
+function endRun(state: GameState | null, skipped = false) {
   const r = run;
   if (!r) return;
   stopWalk();
@@ -134,7 +143,7 @@ function endRun(state: GameState | null) {
   document.body.classList.remove('is-playing');
   run = null;
   hud.classList.add('hidden');
-  r.done(state ? { state, clean: r.clean, moves: screen.sim.moves } : null);
+  r.done(state ? { state, clean: r.clean, moves: screen.sim.moves, skipped } : null);
 }
 
 /** Shows the sim's current state, animated from the one on screen, with its sounds. */
@@ -254,6 +263,16 @@ function act(a: string) {
   if (run.over || run.watching) return;
   if (a === 'hint') {
     askHint();
+    return;
+  }
+  if (a === 'skip' && run.skip !== undefined) {
+    click();
+    // With no compass left, skipping ends the expedition: press twice.
+    if (run.skip > 0 || run.giveUp) endRun(screen.sim.state, true);
+    else {
+      run.giveUp = true;
+      say(t('exp.giveUp'), 5000);
+    }
     return;
   }
   const prev = screen.shown;

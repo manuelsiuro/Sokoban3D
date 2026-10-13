@@ -32,6 +32,7 @@ export const SKINS: Skin[] = [
   { id: 'candy', get name() { return t('skin.candy'); }, crate: 0xff9ec7, trim: 0xffffff },
   { id: 'gold', get name() { return t('skin.gold'); }, crate: 0xffcf4d, trim: 0xb07a12 },
   { id: 'royal', get name() { return t('skin.royal'); }, crate: 0x3f4fd0, trim: 0xffcf4d },
+  { id: 'abyss', get name() { return t('skin.abyss'); }, crate: 0x2a3a5e, trim: 0x5fe3ff },
 ];
 
 export const OUTFITS: Outfit[] = [
@@ -43,6 +44,7 @@ export const OUTFITS: Outfit[] = [
   { id: 'blue', get name() { return t('outfit.blue'); }, cap: 0x2f8fe0, suit: 0x1f3f6a },
   { id: 'purple', get name() { return t('outfit.purple'); }, cap: 0x8d5fd6, suit: 0x3a2a5a },
   { id: 'hardhat', get name() { return t('outfit.hardhat'); }, cap: 0xffc23d, suit: 0xe8763a },
+  { id: 'navigator', get name() { return t('outfit.navigator'); }, cap: 0x2fb8a8, suit: 0xd9b27a },
 ];
 
 export interface Ctx {
@@ -84,9 +86,14 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'daily', get name() { return t('trophy.daily.name'); }, get desc() { return t('trophy.daily.desc'); }, count: (c) => Math.min(1, Object.keys(c.daily.results).length), goal: 1 },
   { id: 'streak', get name() { return t('trophy.streak.name'); }, get desc() { return t('trophy.streak.desc'); }, reward: { skin: 'candy' }, count: (c) => c.daily.best, goal: 7 },
   { id: 'architect', get name() { return t('trophy.architect.name'); }, get desc() { return t('trophy.architect.desc'); }, reward: { outfit: 'hardhat' }, count: (c) => (c.built ? 1 : 0), goal: 1 },
+  { id: 'explorer', get name() { return t('trophy.explorer.name'); }, get desc() { return t('trophy.explorer.desc'); }, reward: { outfit: 'navigator' }, count: () => deepest(), goal: 10 },
+  { id: 'deep', get name() { return t('trophy.deep.name'); }, get desc() { return t('trophy.deep.desc'); }, reward: { skin: 'abyss' }, count: () => deepest(), goal: 25 },
   { id: 'champion', get name() { return t('trophy.champion.name'); }, get desc() { return t('trophy.champion.desc'); }, reward: { skin: 'royal' }, count: (c) => solved(c, ids()), goal: ids().length },
   { id: 'perfect', get name() { return t('trophy.perfect.name'); }, get desc() { return t('trophy.perfect.desc'); }, reward: { skin: 'gold' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.stars ?? 0) >= 3).length, goal: ids().length },
 ];
+
+/** The deepest Expedition floor reached (read from its save, so it can't drift). */
+const deepest = () => readJSON<{ best?: { depth?: number } }>(KEYS.expedition, {}).best?.depth ?? 0;
 
 interface Stored {
   earned: string[];

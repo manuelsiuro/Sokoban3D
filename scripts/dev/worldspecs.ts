@@ -104,4 +104,19 @@ export const SPECS: Record<string, { about: string; slots: Slot[] }> = {
       { name: 'The Grand Clock', difficulty: 5, par: [42, 110], gen: { crates: 3, gates: 4, teleports: 2, w: 7, h: 7, states: 1500000 }, tip: 'The last tick.' },
     ],
   },
+  reverse: {
+    about: 'Mirror Grove (opens after the Desert): pull rules. Crates cannot be pushed; stepping away from one drags it along.',
+    slots: [
+      { name: 'Backwards', difficulty: 1, par: [5, 12], gen: { pull: 1, crates: 1, w: 5, h: 4 }, tip: 'Here you pull: stand by a crate, then step away from it (Shift + arrow, or the Grab button).' },
+      { name: 'Tug of War', difficulty: 1, par: [8, 16], gen: { pull: 1, crates: 1, w: 5, h: 5 }, tip: 'You end up beyond the crate you pull: leave yourself room to step.' },
+      { name: 'Two Ropes', difficulty: 2, par: [10, 20], gen: { pull: 1, crates: 2, w: 5, h: 5 }, tip: 'Corners are no trap here: a crate in a corner can still be pulled out.' },
+      { name: 'Mirror Pond', difficulty: 2, par: [14, 26], gen: { pull: 1, crates: 2, w: 6, h: 5 }, tip: 'Walls next to a pad are a problem: there is no room to step away.' },
+      { name: 'Reflection', difficulty: 3, par: [18, 32], gen: { pull: 1, crates: 2, w: 6, h: 6 }, tip: 'Think from the pad: where must you stand when the crate arrives?' },
+      { name: 'Looking Glass', difficulty: 3, par: [22, 40], gen: { pull: 1, crates: 2, w: 6, h: 6, walls: 0.24 }, tip: 'Narrow halls: pull a crate through, then walk round it.' },
+      { name: 'Hall of Mirrors', difficulty: 3, par: [26, 46], gen: { pull: 1, crates: 3, w: 6, h: 6 }, tip: 'Three crates: bring the far one in first.' },
+      { name: 'Backwater', difficulty: 4, par: [32, 56], gen: { pull: 1, crates: 3, w: 6, h: 6, walls: 0.22 }, tip: 'Every pull leaves you one step further on.' },
+      { name: 'Undertow', difficulty: 4, par: [38, 66], gen: { pull: 1, crates: 3, w: 7, h: 6, states: 800000 }, tip: 'Pull a crate past a pad to make room, then bring it back.' },
+      { name: 'Through the Glass', difficulty: 5, par: [44, 90], gen: { pull: 1, crates: 3, w: 7, h: 7, states: 1200000 }, tip: 'The grove\'s last riddle: everything backwards at once.' },
+    ],
+  },
 };
