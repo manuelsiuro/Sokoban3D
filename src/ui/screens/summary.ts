@@ -24,21 +24,30 @@ export interface SummaryInfo {
 /** A solved level: stars, moves against par, and what to do next. */
 export function showSummary(r: SummaryInfo, click: () => void): Promise<SummaryChoice> {
   const hint = r.stars < 3 ? `${r.limits[1]} moves or fewer for ★★★` : r.moves <= r.par ? 'Matched the par!' : 'Three stars';
+  const notes = [r.par ? hint : '', r.best ? 'New best' : '', r.clean ? 'No undo' : ''].filter(Boolean);
+  const stat = (label: string, value: number | string, cls = '') => `<span class="stat ${cls}"><b>${value}</b><small>${label}</small></span>`;
   const el = h(
     'div',
     'modal',
     `<div class="card summary-card">
+      <div class="summary-burst" aria-hidden="true"></div>
       <h2>Solved!</h2>
-      <div class="summary-stars">${[0, 1, 2].map((k) => `<i class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.15}s">${icon('star', 40)}</i>`).join('')}</div>
-      <p class="summary-moves"><b>${r.moves}</b> moves · ${r.pushes} pushes${r.par ? ` · par ${r.par}` : ''}</p>
-      <p class="summary-time">${r.par ? hint : ''}${r.best ? `${r.par ? ' · ' : ''}new best` : ''}${r.clean ? ' · no undo' : ''}</p>
+      <div class="summary-stars" aria-label="${r.stars} of 3 stars">${[0, 1, 2].map((k) => `<i class="${k < r.stars ? 'on' : ''}" style="animation-delay:${0.2 + k * 0.15}s">${icon('star', k === 1 ? 54 : 42)}</i>`).join('')}</div>
+      <div class="summary-stats">
+        ${stat('moves', r.moves, r.par && r.moves <= r.par ? 'par-hit' : '')}
+        ${stat('pushes', r.pushes)}
+        ${r.par ? stat('par', r.par) : ''}
+      </div>
+      ${notes.length ? `<p class="summary-notes">${notes.map((n) => `<span>${n}</span>`).join('')}</p>` : ''}
       ${r.extra ? `<p class="summary-extra">${r.extra}</p>` : ''}
-      <div class="actions">
-        <button class="big-btn ghost" data-c="levels" aria-label="Levels">${icon('home', 18)}</button>
-        ${r.watch ? `<button class="big-btn ghost" data-c="watch" aria-label="Watch your best run">${icon('play', 18)} Watch best</button>` : ''}
-        ${r.share ? `<button class="big-btn ghost" data-share>${icon('map', 18)} Share</button>` : ''}
-        <button class="big-btn ${r.hasNext ? 'ghost' : 'primary'}" data-c="retry">${icon('replay', 18)} Retry</button>
-        ${r.hasNext ? `<button class="big-btn primary" data-c="next">Next ${icon('chevronRight', 18)}</button>` : ''}
+      <div class="summary-actions">
+        ${r.hasNext ? `<button class="big-btn primary wide" data-c="next">Next level ${icon('chevronRight', 18)}</button>` : `<button class="big-btn primary wide" data-c="retry">${icon('replay', 18)} Play again</button>`}
+        <div class="summary-row">
+          <button class="big-btn ghost" data-c="levels" aria-label="Levels" title="Levels">${icon('home', 18)}</button>
+          ${r.hasNext ? `<button class="big-btn ghost" data-c="retry" aria-label="Retry">${icon('replay', 18)} Retry</button>` : ''}
+          ${r.watch ? `<button class="big-btn ghost" data-c="watch" aria-label="Watch your best run">${icon('play', 16)} Watch</button>` : ''}
+          ${r.share ? `<button class="big-btn ghost" data-share>${icon('share', 18)} Share</button>` : ''}
+        </div>
       </div>
     </div>`,
   );

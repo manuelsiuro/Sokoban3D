@@ -2,7 +2,17 @@
  * How each world looks: sky, ground, walls, crates and decor. Visual only: the rules never
  * read a biome. A new world is mostly a new entry here (and its mechanic in the sim).
  */
-export type DecorKind = 'tree' | 'flower' | 'rock' | 'pine' | 'snowRock' | 'cactus' | 'pillar' | 'cloud' | 'basalt' | 'crystal' | 'gear';
+export type DecorKind = 'tree' | 'bush' | 'flower' | 'rock' | 'pine' | 'snowRock' | 'cactus' | 'pillar' | 'cloud' | 'basalt' | 'ember' | 'crystal' | 'gear' | 'lamp' | 'mushroom' | 'grass';
+
+/** What drifts around the island: clouds, ash and embers, glowing motes, snow, gears. */
+export interface Atmosphere {
+  /** Clouds around and below (top and belly colors), or none. */
+  clouds?: { top: number; belly: number; count: number };
+  /** Small particles: snow falls, embers and motes rise. */
+  motes?: { color: number; count: number; rise: number; size: number; glow: boolean };
+  /** Big slow things in the distance. */
+  far?: 'gears' | 'shards' | 'islands';
+}
 
 export interface Biome {
   skyTop: number;
@@ -26,6 +36,7 @@ export interface Biome {
   sunIntensity: number;
   ambient: number;
   decor: DecorKind[];
+  air: Atmosphere;
 }
 
 export const BIOMES: Record<string, Biome> = {
@@ -35,15 +46,17 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'hedge', wallColor: 0x4f9e48, wallTop: 0x63b956,
     crate: 0xd29a55, crateTrim: 0x8c5a2b, goal: 0xffd447,
     sun: 0xfff1d6, sunIntensity: 2.4, ambient: 1.25,
-    decor: ['tree', 'tree', 'flower', 'flower', 'flower', 'rock'],
+    decor: ['tree', 'tree', 'bush', 'flower', 'flower', 'flower', 'grass', 'grass', 'rock', 'mushroom'],
+    air: { clouds: { top: 0xffffff, belly: 0xc6d8ea, count: 9 }, motes: { color: 0xfff6c8, count: 40, rise: 0.08, size: 0.07, glow: false }, far: 'islands' },
   },
   tundra: {
     skyTop: 0x8fb4e0, skyBottom: 0xeef4fb, fog: 0xe6eef8,
     ground: 0xf2f7fc, ground2: 0xe5eef7, soil: 0x8aa0b8, rock: 0x6f8296,
-    wall: 'ice', wallColor: 0x6f86a3, wallTop: 0xf7fbff,
+    wall: 'ice', wallColor: 0x8cc6ec, wallTop: 0xf7fbff,
     crate: 0xc98f54, crateTrim: 0x7d4f27, goal: 0x5fe3ff,
     sun: 0xf2f6ff, sunIntensity: 2.2, ambient: 1.4,
-    decor: ['pine', 'pine', 'snowRock'],
+    decor: ['pine', 'pine', 'pine', 'snowRock', 'snowRock'],
+    air: { clouds: { top: 0xffffff, belly: 0xbccbe0, count: 8 }, motes: { color: 0xffffff, count: 260, rise: -0.6, size: 0.09, glow: false }, far: 'islands' },
   },
   desert: {
     skyTop: 0xf2b66d, skyBottom: 0xfbe6c4, fog: 0xf7dfba,
@@ -51,7 +64,8 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'sandstone', wallColor: 0xc4834a, wallTop: 0xd89d5c,
     crate: 0xb77b45, crateTrim: 0x6f4421, goal: 0x3fd0c9,
     sun: 0xffe2b0, sunIntensity: 2.6, ambient: 1.15,
-    decor: ['cactus', 'cactus', 'pillar', 'rock'],
+    decor: ['cactus', 'cactus', 'pillar', 'rock', 'grass'],
+    air: { clouds: { top: 0xfff8ea, belly: 0xf0c99a, count: 5 }, motes: { color: 0xffe2a8, count: 60, rise: 0.05, size: 0.06, glow: false }, far: 'islands' },
   },
   sky: {
     skyTop: 0x7aa6ff, skyBottom: 0xf3e7ff, fog: 0xece6ff,
@@ -59,7 +73,8 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'cloud', wallColor: 0xf4f2ff, wallTop: 0xffffff,
     crate: 0xe0b06a, crateTrim: 0x94652f, goal: 0xff8fd0,
     sun: 0xfff3e6, sunIntensity: 2.2, ambient: 1.35,
-    decor: ['cloud', 'tree', 'flower'],
+    decor: ['cloud', 'cloud', 'tree', 'bush', 'flower', 'flower'],
+    air: { clouds: { top: 0xffffff, belly: 0xd9cdf2, count: 14 }, motes: { color: 0xffffff, count: 40, rise: 0.1, size: 0.07, glow: true }, far: 'islands' },
   },
   forge: {
     skyTop: 0x2a1a2e, skyBottom: 0x7a3326, fog: 0x4a2622,
@@ -67,7 +82,8 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'basalt', wallColor: 0x2a252e, wallTop: 0x3a3340,
     crate: 0x9a9fa8, crateTrim: 0x5d6168, goal: 0xff9a3d,
     sun: 0xffb27a, sunIntensity: 2.0, ambient: 0.9,
-    decor: ['basalt', 'basalt', 'rock'],
+    decor: ['basalt', 'basalt', 'ember', 'ember', 'rock'],
+    air: { clouds: { top: 0x5a4a4e, belly: 0x2a1e22, count: 7 }, motes: { color: 0xff8a2a, count: 140, rise: 0.7, size: 0.08, glow: true } },
   },
   crystal: {
     skyTop: 0x1b1f4a, skyBottom: 0x4a3d86, fog: 0x332c66,
@@ -75,7 +91,8 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'crystal', wallColor: 0x6d5bd0, wallTop: 0x9b8cf2,
     crate: 0xc9a46b, crateTrim: 0x7a5a30, goal: 0x7dffd6,
     sun: 0xcfd8ff, sunIntensity: 1.8, ambient: 1.0,
-    decor: ['crystal', 'crystal', 'rock'],
+    decor: ['crystal', 'crystal', 'crystal', 'mushroom', 'rock'],
+    air: { motes: { color: 0x9bf0ff, count: 120, rise: 0.12, size: 0.08, glow: true }, far: 'shards' },
   },
   clockwork: {
     skyTop: 0x3b5470, skyBottom: 0xd9c49a, fog: 0xc9b58c,
@@ -83,7 +100,8 @@ export const BIOMES: Record<string, Biome> = {
     wall: 'brass', wallColor: 0x4a3f38, wallTop: 0x6b5d50,
     crate: 0x8c6a4a, crateTrim: 0x4f3a26, goal: 0xff8f5a,
     sun: 0xffe9c4, sunIntensity: 2.2, ambient: 1.1,
-    decor: ['gear', 'gear', 'pillar'],
+    decor: ['gear', 'gear', 'lamp', 'lamp', 'pillar'],
+    air: { clouds: { top: 0xfff1d8, belly: 0xc9a98a, count: 7 }, motes: { color: 0xffd98a, count: 40, rise: 0.06, size: 0.06, glow: true }, far: 'gears' },
   },
 };
 

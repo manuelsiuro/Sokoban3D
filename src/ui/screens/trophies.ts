@@ -18,7 +18,7 @@ export function showTrophies(
     const done = have.has(a.id);
     return `<div class="trophy ${done ? 'done' : ''}">
       <span class="trophy-ic">${icon(done ? 'trophy' : 'lock', 18)}</span>
-      <span class="trophy-text"><b>${a.name}</b><small>${a.desc}${reward(a) ? ` · ${reward(a)}` : ''}</small><i style="--done:${((n / a.goal) * 100).toFixed(1)}%"></i></span>
+      <span class="trophy-text"><b>${a.name}</b><small>${a.desc}</small>${reward(a) ? `<em class="trophy-reward">${reward(a)}</em>` : ''}<i style="--done:${((n / a.goal) * 100).toFixed(1)}%"></i></span>
       <span class="trophy-count">${done ? icon('check', 16) : `${n}/${a.goal}`}</span>
     </div>`;
   };
@@ -37,7 +37,9 @@ export function showTrophies(
         <span class="pill big">${icon('trophy', 16)} ${have.size}/${ACHIEVEMENTS.length}</span>
       </div>
       <h3 class="sub-head">Wardrobe</h3>
+      <p class="swatch-label">Crate skins</p>
       <div class="swatches">${SKINS.map((s) => swatch('skin', s.id, s.name, s.crate, s.trim, unlocked.skins.has(s.id), chosen.skin === s.id)).join('')}</div>
+      <p class="swatch-label">Outfits</p>
       <div class="swatches">${OUTFITS.map((o) => swatch('outfit', o.id, o.name, o.cap, o.suit, unlocked.outfits.has(o.id), chosen.outfit === o.id)).join('')}</div>
       <h3 class="sub-head">Achievements</h3>
       <div class="trophies">${ACHIEVEMENTS.map(item).join('')}</div>

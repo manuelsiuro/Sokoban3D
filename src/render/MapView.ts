@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { rng } from '../sim/rng';
 import { biomeOf } from '../world/biomes';
 import { crateModel, decorModel, goalModel, mat, wallModel } from './models';
+import { cloudGeometry, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 
 /**
@@ -26,6 +27,7 @@ export class MapView {
   private sky: THREE.CanvasTexture;
   private now = 0;
   private raycaster = new THREE.Raycaster();
+  private clouds: THREE.Object3D[] = [];
 
   constructor(
     readonly renderer: THREE.WebGLRenderer,
@@ -58,6 +60,16 @@ export class MapView {
       this.locks.push(lock);
       if (k > 0) this.trail(this.spot(k - 1), this.spot(k), k);
     });
+    // Clouds drifting below the islands.
+    const R = rng(4242);
+    const cloud = mat(0xffffff, { rough: 1, vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0.3 });
+    for (let k = 0; k < worlds.length * 2; k++) {
+      const big = 0.8 + R.next() * 0.8;
+      const c = new THREE.Mesh(cloudGeometry(R.next, { length: 3 * big, height: 1.1 * big, depth: 1.6 * big, puffs: 5 }), cloud);
+      c.position.set(-6 + R.next() * (worlds.length * 9 + 12), -6 - R.next() * 5, -14 + R.next() * 10);
+      this.scene.add(c);
+      this.clouds.push(c);
+    }
     this.select(0, true);
   }
 
@@ -144,6 +156,10 @@ export class MapView {
       isl.rotation.y = k === this.selected ? Math.sin(time * 0.4) * 0.12 : 0;
     });
     for (const l of this.locks) l.rotation.y = time;
+    for (const c of this.clouds) {
+      c.position.x += dt * 0.25;
+      if (c.position.x > this.islands.length * 9 + 8) c.position.x = -8;
+    }
     // Portrait screens pull back, so the neighbours stay in view.
     const back = 22 / Math.min(1, this.camera.aspect * 1.1);
     const f = this.shownFocus;
@@ -185,8 +201,8 @@ function buildIsland(world: string, seed: number): THREE.Group {
     const edge = Math.max(Math.abs(x), Math.abs(z));
     g.add(keep(new THREE.Mesh(top, mat((x + z) & 1 ? b.ground2 : b.ground, { rough: 0.95 })), x, -0.15, z));
     g.add(keep(new THREE.Mesh(new THREE.BoxGeometry(1, 0.6, 1), mat(b.soil)), x, -0.6, z));
-    const depth = 0.6 + (2 - edge) * 0.9 + R.next() * 0.5;
-    g.add(keep(new THREE.Mesh(new THREE.BoxGeometry(0.94, depth, 0.94), mat(b.rock, { flat: true })), x, -0.9 - depth / 2, z));
+    const depth = 0.8 + (2 - edge) * 1.1 + R.next() * 0.6;
+    g.add(keep(new THREE.Mesh(spikeGeometry(R.next, 0.68, depth * 1.3), mat(b.rock, { flat: true })), x, -0.88, z));
   }
   // A wall piece, a crate on a pad, decor on the rim.
   const wall = wallModel(b, seed);

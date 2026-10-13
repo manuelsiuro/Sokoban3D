@@ -26,6 +26,7 @@ const P: Record<string, string> = {
   download: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>',
   share: '<path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/>',
   plusSquare: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
+  hammer: '<path d="m14 6 4 4"/><path d="M15.5 4.5 13 2 9 6l2.5 2.5"/><path d="M16 8 5 19a1.4 1.4 0 0 1-2-2L14 6"/><path d="m15.5 4.5 4 4L21 7l-4-4Z"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
 };
 

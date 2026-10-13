@@ -88,19 +88,161 @@
 
 .summary-stars {
   display: flex;
+  align-items: flex-end;
   justify-content: center;
-  gap: 8px;
-  margin: 16px 0 8px;
+  gap: 6px;
+  margin: 12px 0 14px;
   color: #d5dde7;
+}
+
+.summary-stars i .ic {
+  fill: #e8edf3;
+}
+
+.summary-stars i:nth-child(2) {
+  transform: translateY(-8px);
 }
 
 .summary-stars i.on {
   color: #f2a51f;
-  animation: card-in 0.4s var(--spring) backwards;
+  filter: drop-shadow(0 4px 8px rgba(242, 165, 31, 0.45));
+  animation: star-in 0.55s var(--spring) backwards;
 }
 
 .summary-stars i.on .ic {
   fill: #ffd34d;
+}
+
+@keyframes star-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-40deg);
+  }
+}
+
+.summary-stars i:nth-child(2).on {
+  animation-name: star-in-mid;
+}
+
+@keyframes star-in-mid {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.2) rotate(-40deg);
+  }
+}
+
+/* The summary: a burst of light behind the stars, stat tiles, then what's next. */
+.summary-card {
+  position: relative;
+  overflow: hidden;
+  padding-top: 26px;
+}
+
+.summary-card > :not(.summary-burst) {
+  position: relative;
+}
+
+.summary-burst {
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  width: 360px;
+  height: 360px;
+  margin-left: -180px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 210, 80, 0.16) 0 10deg, transparent 10deg 20deg);
+  -webkit-mask: radial-gradient(circle, black 30%, transparent 68%);
+  mask: radial-gradient(circle, black 30%, transparent 68%);
+  animation: burst-spin 24s linear infinite;
+}
+
+@keyframes burst-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.summary-stats {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  max-width: 104px;
+  padding: 8px 6px 7px;
+  border-radius: 14px;
+  background: #f1f5fa;
+  box-shadow: inset 0 0 0 1px rgba(18, 35, 58, 0.05);
+}
+
+.stat b {
+  font: 700 24px/1.1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.stat.par-hit {
+  color: #8a5a00;
+  background: linear-gradient(180deg, #fff6d6, #ffe7a3);
+  box-shadow: inset 0 0 0 1px rgba(242, 165, 31, 0.35);
+}
+
+.summary-notes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.summary-notes span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1d5aa8;
+  background: rgba(47, 127, 216, 0.1);
+}
+
+.summary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.big-btn.wide {
+  width: 100%;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.summary-row .big-btn {
+  flex: 1 1 auto;
+  height: 46px;
+  padding: 0 14px;
+  font-size: 16px;
+}
+
+.summary-row .big-btn[data-c='levels'] {
+  flex: 0 0 46px;
+  padding: 0;
 }
 
 .summary-time {
@@ -124,4 +266,127 @@
 
 .summary-moves b {
   font: 700 22px var(--font-display);
+}
+
+/* ------------------------------------------------------------ interaction states */
+.icon-btn,
+.menu-btn,
+.level-card,
+.swatch,
+.sound-toggle,
+.install-btn,
+.carousel-arrow {
+  transition: transform 0.18s var(--spring), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease), opacity 0.2s;
+}
+
+.icon-btn:active,
+.menu-btn:active,
+.level-card:not([disabled]):active,
+.swatch:not([disabled]):active,
+.sound-toggle:active,
+.install-btn:active,
+.carousel-arrow:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) {
+  .icon-btn:not([disabled]):hover,
+  .carousel-arrow:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px -10px rgba(20, 50, 90, 0.4), 0 2px 6px rgba(20, 50, 90, 0.1);
+  }
+  .menu-btn:hover,
+  .hero-card:hover,
+  .level-card:not([disabled]):hover,
+  .swatch:not([disabled]):hover {
+    transform: translateY(-2px);
+  }
+  .big-btn:not([disabled]):hover {
+    filter: brightness(1.05);
+  }
+  .big-btn.ghost:not([disabled]):hover {
+    background: white;
+  }
+}
+
+.icon-btn[disabled],
+.big-btn[disabled] {
+  cursor: default;
+}
+
+:is(.menu-btn, .hero-card, .level-card, .swatch, .big-btn, .icon-btn):focus-visible {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 3px;
+}
+
+/* A modal's card has a little header: the title, and a close button on the right. */
+.card-head {
+  position: relative;
+  margin-bottom: 6px;
+}
+
+.card-head {
+  padding: 0 44px;
+}
+
+.card-head .icon-btn {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  box-shadow: none;
+  background: rgba(18, 35, 58, 0.06);
+}
+
+.modal {
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* A modal never hides its buttons below the fold: it scrolls when taller than the window. */
+.modal {
+  overflow-y: auto;
+  place-items: safe center;
+}
+
+@media (max-height: 480px) {
+  .card {
+    padding: 16px 20px;
+  }
+  .card h2 {
+    font-size: 26px;
+  }
+  .summary-card {
+    padding-top: 14px;
+  }
+  .summary-stars {
+    margin: 4px 0 8px;
+  }
+  .summary-stats {
+    margin-bottom: 8px;
+  }
+  .stat {
+    padding: 5px 6px 4px;
+  }
+  .stat b {
+    font-size: 20px;
+  }
+  .summary-notes {
+    margin-bottom: 10px;
+  }
+  .summary-row .big-btn {
+    height: 42px;
+  }
 }

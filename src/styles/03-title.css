@@ -12,11 +12,37 @@
   animation: fade 0.6s var(--ease);
 }
 
+/* A calm reading area: the island keeps turning, but softly veiled behind the menu. */
+.title-screen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 52% 62% at 50% 55%, rgba(236, 246, 255, 0.62), rgba(236, 246, 255, 0.28) 55%, transparent 80%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 30%, transparent 70%, rgba(20, 50, 90, 0.12));
+  pointer-events: none;
+}
+
+.title-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.42);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 24px 60px -20px rgba(20, 50, 90, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  animation: card-in 0.5s var(--spring) 0.1s backwards;
+}
+
 .title-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(16px, 3.5vh, 32px);
+  gap: clamp(12px, 3vh, 26px);
   width: min(440px, 100%);
 }
 
@@ -25,15 +51,28 @@
 }
 
 .logo-mark {
-  display: grid;
-  place-items: center;
-  width: 78px;
-  height: 78px;
-  margin: 0 auto 12px;
-  border-radius: 24px;
-  color: white;
-  background: linear-gradient(145deg, #5fb2ff, #2a6fc4);
-  box-shadow: 0 16px 40px -10px rgba(42, 111, 196, 0.8), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  width: clamp(72px, 14vh, 116px);
+  margin: 0 auto 2px;
+  filter: drop-shadow(0 14px 16px rgba(20, 50, 90, 0.28));
+  animation: logo-bob 4s ease-in-out infinite;
+}
+
+.logo-crate {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.logo-pad {
+  fill: rgba(255, 212, 71, 0.35);
+  stroke: #ffd447;
+  stroke-width: 6;
+}
+
+@keyframes logo-bob {
+  50% {
+    transform: translateY(-6px) rotate(-2deg);
+  }
 }
 
 .logo h1 {
@@ -44,8 +83,14 @@
 }
 
 .tagline {
+  display: inline-block;
   margin: 12px 0 0;
-  font: 500 20px var(--font-display);
+  padding: 3px 14px;
+  border-radius: 999px;
+  font: 600 17px var(--font-display);
+  letter-spacing: 0.02em;
+  color: #1d4f8f;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .title-actions {
@@ -210,23 +255,44 @@
   background: linear-gradient(90deg, var(--tone), var(--tone-2));
 }
 
-/* Footer: the sound switch (always reachable) and a hint. */
+/* Footer: the sound switch (always reachable), settings, and the install offer. */
 .title-foot {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px 6px 6px;
+  padding: 2px 2px 0;
+}
+
+.keys-hint {
+  margin: -2px 0 0;
+  padding: 4px 12px;
   border-radius: 999px;
-  font-size: 13px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.keys-hint kbd {
+  display: inline-block;
+  min-width: 18px;
+  margin: 0 1px;
+  padding: 0 4px;
+  border-radius: 5px;
+  font: 700 10.5px/17px var(--font-ui);
+  text-align: center;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 0 rgba(18, 35, 58, 0.18);
 }
 
 .sound-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px 4px 8px;
+  height: 36px;
+  padding: 0 14px 0 11px;
   border-radius: 999px;
   font: 700 12.5px var(--font-ui);
   color: white;
@@ -248,13 +314,77 @@
   background: rgba(255, 255, 255, 0.55);
 }
 
-body.touch .title-foot > span {
+body.touch .keys-hint {
   display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-card::before {
+  .hero-card::before,
+  .logo-mark {
     animation: none;
+  }
+}
+
+/* Short, wide screens (phone landscape): the logo on the left, the menu on the right. */
+@media (max-height: 520px) and (min-width: 600px) {
+  .title-screen {
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  .title-screen::before {
+    background: radial-gradient(ellipse 70% 80% at 60% 50%, rgba(236, 246, 255, 0.55), transparent 80%);
+  }
+  .title-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    align-items: center;
+    column-gap: 20px;
+    row-gap: 8px;
+    width: min(860px, 100%);
+  }
+  .logo {
+    grid-row: 1 / span 2;
+  }
+  .logo-mark {
+    width: clamp(56px, 20vh, 96px);
+  }
+  .logo h1 {
+    font-size: clamp(34px, min(7vw, 13vh), 64px);
+  }
+  .tagline {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  .title-panel {
+    gap: 7px;
+    padding: 9px;
+    border-radius: 22px;
+  }
+  .title-actions {
+    gap: 7px;
+  }
+  .hero-card {
+    min-height: 54px;
+  }
+  .hero-ic {
+    width: 38px;
+    height: 38px;
+  }
+  .menu-btn {
+    height: 46px;
+  }
+  .menu-ic {
+    width: 32px;
+    height: 32px;
+  }
+  .keys-hint {
+    justify-self: center;
+  }
+}
+
+/* Very short and narrow: just less space. */
+@media (max-height: 520px) and (max-width: 599px) {
+  .logo-mark {
+    display: none;
   }
 }
 
@@ -279,7 +409,9 @@ body.touch .title-foot > span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0 14px;
   border-radius: 999px;
   font: 700 13px var(--font-ui);
   color: white;

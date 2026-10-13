@@ -202,7 +202,7 @@ export function showEditor(start: Draft, hooks: EditorHooks): Promise<EditorChoi
       <div class="actions ed-actions">
         <button class="big-btn ghost" data-act="clear">${icon('close', 16)} New</button>
         <button class="big-btn ghost" data-act="check">${icon('bulb', 16)} Check</button>
-        <button class="big-btn ghost" data-act="share">${icon('map', 16)} Share</button>
+        <button class="big-btn ghost" data-act="share">${icon('share', 16)} Share</button>
         <button class="big-btn primary" data-act="play">${icon('play', 16)} Play</button>
       </div>
     </div>`,

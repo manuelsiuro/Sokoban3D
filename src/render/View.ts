@@ -5,6 +5,8 @@ import { DX, DY, TILE, VOID, type Grid } from '../sim/grid';
 import { EVENT, type GameState } from '../sim/Sim';
 import { rng } from '../sim/rng';
 import { biomeOf, type Biome } from '../world/biomes';
+import { Atmosphere } from './atmosphere';
+import { bake, plain, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 import { CRATE_COLORS, Mechanics, dressCrate, tileColor } from './mechanics';
 import { CRATE, crateModel, decorModel, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
@@ -63,7 +65,9 @@ export class View {
   private dur = MOVE_T;
   private now = 0;
   private particles: Particle[] = [];
-  private clouds: THREE.Object3D[] = [];
+  private air: Atmosphere | null = null;
+  /** Decor parts that turn (gears). */
+  private spinners: THREE.Object3D[] = [];
   private state: GameState | null = null;
   private wonAt = -1;
   /** Camera yaw in quarter turns (0: looking north), and the shown, eased yaw. */
@@ -186,13 +190,15 @@ export class View {
         if (!ok) break;
         edge = r;
       }
-      const depth = 0.7 + edge * 0.75 + R.next() * 0.5;
+      const depth = 0.7 + edge * 0.9 + R.next() * 0.8;
       const wx = x - (grid.w - 1) / 2;
       const wz = y - (grid.h - 1) / 2;
       // Below the cell's own floor (pits and lava sit lower than the ground around them).
       const base = Math.min(0, z) * LEVEL_H - 0.3;
-      rock.push(new THREE.BoxGeometry(0.96 - edge * 0.02, depth, 0.96 - edge * 0.02).translate(wx, base - 0.5 - depth / 2, wz));
       soil.push(new THREE.BoxGeometry(1, 0.5, 1).translate(wx, base - 0.25, wz));
+      // A band of rock, then a craggy spike: together they hang like a chunk of land.
+      rock.push(plain(new THREE.BoxGeometry(0.98, 0.3, 0.98).translate(wx, base - 0.65, wz)));
+      rock.push(spikeGeometry(R.next, 0.66 + R.next() * 0.1, depth * 1.2).translate(wx, base - 0.78, wz));
     }
     const add = (geos: THREE.BufferGeometry[], m: THREE.Material, cast = false) => {
       if (!geos.length) return;
@@ -208,12 +214,13 @@ export class View {
     add(soil, mat(b.soil, { rough: 1 }), true);
     add(rock, mat(b.rock, { rough: 1, flat: true }), true);
 
-    // Walls, goals, decor.
+    // Walls, goals, decor. Walls and decor are merged into a few meshes.
+    const statics = new THREE.Group();
     for (let c = 0; c < grid.w * grid.h; c++) {
       if (grid.wall[c]) {
         const w = wallModel(b, c);
         this.pos(c, grid.floor[c], w.position);
-        this.world.add(w);
+        statics.add(w);
       }
       if (grid.goal[c]) {
         const { group, glow } = goalModel(b);
@@ -233,26 +240,18 @@ export class View {
       if (solid(x, y) || R.next() > 0.45) continue;
       const d = decorModel(R.pick(b.decor), b, R.next);
       d.position.set(x - (grid.w - 1) / 2 + (R.next() - 0.5) * 0.3, z * LEVEL_H, y - (grid.h - 1) / 2 + (R.next() - 0.5) * 0.3);
-      this.world.add(d);
+      statics.add(d);
     }
-    // Clouds drifting around and below.
-    this.clouds = [];
-    for (let k = 0; k < 7; k++) {
-      const cl = new THREE.Group();
-      const puff = new THREE.IcosahedronGeometry(1, 1);
-      for (let p = 0; p < 4; p++) {
-        const m = new THREE.Mesh(puff, mat(0xffffff, { rough: 1, emissive: 0xffffff, emissiveIntensity: 0.35 }));
-        m.position.set(p * 1.1 - 1.6, (p % 2) * 0.4, R.next() * 0.6);
-        m.scale.setScalar(0.5 + R.next() * 0.4);
-        cl.add(m);
-      }
-      const a = (k / 7) * Math.PI * 2 + R.next();
-      const dist = Math.max(grid.w, grid.h) * 0.8 + 4 + R.next() * 6;
-      cl.position.set(Math.cos(a) * dist, -5 - R.next() * 6, Math.sin(a) * dist);
-      cl.userData.speed = 0.15 + R.next() * 0.2;
-      this.world.add(cl);
-      this.clouds.push(cl);
+    const baked = bake(statics);
+    this.world.add(baked);
+    this.spinners = baked.children.filter((o) => o.userData.spin);
+    // Clouds, particles and far-off shapes.
+    if (this.air) {
+      this.scene.remove(this.air.group);
+      this.air.dispose();
     }
+    this.air = new Atmosphere(b, Math.max(grid.w, grid.h) / 2 + 1, hash(level.id));
+    this.scene.add(this.air.group);
 
     // Crates.
     for (let k = 0; k < grid.crates.length; k++) {
@@ -589,9 +588,9 @@ export class View {
         this.particles.splice(k, 1);
       }
     }
-    for (const c of this.clouds) {
-      c.position.x += c.userData.speed * dt;
-      if (c.position.x > 30) c.position.x = -30;
+    if (!this.reducedMotion) {
+      this.air?.update(time, dt);
+      for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
     }
     this.placeCamera(dt);
     this.renderer.render(this.scene, this.camera);

@@ -53,6 +53,9 @@ export class Mechanics {
   private chevrons: { m: THREE.Object3D; base: THREE.Vector3; dir: number }[] = [];
   private swirls: THREE.Object3D[] = [];
   private lava: THREE.MeshStandardMaterial | null = null;
+  /** Lava surface: crust plates that drift, bubbles that swell and pop. */
+  private crust: { m: THREE.Object3D; base: THREE.Vector3; phase: number }[] = [];
+  private bubbles: { m: THREE.Object3D; phase: number; speed: number }[] = [];
   private beams = new THREE.Group();
   private beamKey = '';
   private state: GameState | null = null;
@@ -177,8 +180,26 @@ export class Mechanics {
         o.position.copy(at);
         this.receivers.set(c, gem);
         this.group.add(shadowed(o));
-      } else if (t === TILE.lava && !this.lava) {
-        this.lava = mat(0xff6a1a, { rough: 0.5, emissive: 0xff4a10, emissiveIntensity: 1.2 });
+      } else if (t === TILE.lava) {
+        if (!this.lava) this.lava = mat(0xff6a1a, { rough: 0.5, emissive: 0xff4a10, emissiveIntensity: 1.2 });
+        const crustMat = mat(0x3a2a2a, { rough: 0.9, flat: true, emissive: 0x401000, emissiveIntensity: 0.4 });
+        for (let k = 0; k < 2; k++) {
+          const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.13 + ((c * 7 + k * 3) % 5) * 0.02, 0), crustMat);
+          m.scale.set(1.3, 0.25, 1);
+          const base = at.clone().add(new THREE.Vector3(k ? 0.18 : -0.15, 0.01, k ? -0.12 : 0.16));
+          m.position.copy(base);
+          m.rotation.y = c + k;
+          m.receiveShadow = true;
+          this.crust.push({ m, base, phase: c * 0.37 + k * 2 });
+          this.group.add(m);
+        }
+        const bubbleMat = mat(0xffa040, { emissive: 0xff7a20, emissiveIntensity: 1.6, rough: 0.3 });
+        for (let k = 0; k < 2; k++) {
+          const m = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), bubbleMat);
+          m.position.copy(at).add(new THREE.Vector3(((c * 13 + k * 7) % 7) / 10 - 0.3, 0, ((c * 5 + k * 11) % 7) / 10 - 0.3));
+          this.bubbles.push({ m, phase: (c * 0.61 + k * 0.5) % 1, speed: 0.5 + ((c + k) % 3) * 0.15 });
+          this.group.add(m);
+        }
       }
     }
   }
@@ -258,6 +279,19 @@ export class Mechanics {
     }
     for (const sw of this.swirls) sw.rotation.y = time * 2;
     if (this.lava) this.lava.emissiveIntensity = 1 + Math.sin(time * 2) * 0.25;
+    for (const k of this.crust) {
+      k.m.position.set(k.base.x + Math.sin(time * 0.4 + k.phase) * 0.06, k.base.y, k.base.z + Math.cos(time * 0.3 + k.phase) * 0.06);
+      k.m.rotation.y += dt * 0.1;
+    }
+    // A crate sunk in a pool hides its bubbles and crust.
+    const sunk = (o: THREE.Object3D) => s.crates.some((k) => k.cell >= 0 && this.pos(k.cell, k.z).distanceToSquared(o.position) < 0.4 && this.g.tile[k.cell] === TILE.lava);
+    for (const b of this.bubbles) {
+      const t = (time * b.speed + b.phase) % 1;
+      // Swell for most of the cycle, then pop.
+      b.m.scale.setScalar(t < 0.85 ? 0.3 + t * 1.2 : 0.01);
+      b.m.visible = !sunk(b.m);
+    }
+    for (const k of this.crust) k.m.visible = !sunk(k.m);
   }
 }
 

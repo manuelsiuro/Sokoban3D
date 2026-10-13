@@ -2,6 +2,18 @@ import { h } from '../dom';
 import { icon } from '../icons';
 import { installKind, onInstallChange } from '../../app/install';
 
+/** The logo mark: the crate from the app icon, on its glowing pad. */
+const LOGO = `<svg class="logo-crate" viewBox="0 0 160 150" aria-hidden="true">
+  <ellipse class="logo-pad" cx="80" cy="128" rx="58" ry="17"/>
+  <g stroke="#7a4c22" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M24 46 L80 18 L136 46 L80 74 Z" fill="#f0bd76"/>
+    <path d="M24 46 L80 74 L80 136 L24 108 Z" fill="#d89c55"/>
+    <path d="M80 74 L136 46 L136 108 L80 136 Z" fill="#b97a3c"/>
+    <path d="M33 60 L71 122 M127 60 L89 122 M44 41 L100 68" fill="none" opacity="0.85"/>
+  </g>
+  <path d="M30 47 L80 22" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+</svg>`;
+
 export type TitleChoice = 'play' | 'worlds' | 'daily' | 'workshop' | 'trophies' | 'settings' | 'install';
 
 export interface TitleInfo {
@@ -34,7 +46,8 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
     'div',
     'title-screen',
     `<div class="title-inner">
-      <div class="logo"><div class="logo-mark">${icon('crate', 40)}</div><h1>Cratelands</h1><p class="tagline">Push, slide, climb.</p></div>
+      <div class="logo"><div class="logo-mark">${LOGO}</div><h1>Cratelands</h1><p class="tagline">Push, slide, climb.</p></div>
+      <div class="title-panel">
       <div class="title-actions">
         <button class="hero-card play-card" data-c="play" style="--done:${done}%">
           <span class="hero-ic">${icon('play', 22)}</span>
@@ -53,7 +66,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
         </button>
         <div class="menu-pair">
           <button class="menu-btn" data-c="workshop" style="--tone:#7466f0;--tone-2:#4f3fd1;--done:0%">
-            <span class="menu-ic">${icon('crate', 18)}</span>
+            <span class="menu-ic">${icon('hammer', 18)}</span>
             <span class="menu-text"><span class="menu-label">Workshop</span><small>Build and share</small></span>
           </button>
           <button class="menu-btn" data-c="trophies" style="--tone:#f2a51f;--tone-2:#c77d0a;--done:${((info.trophies.have / info.trophies.total) * 100).toFixed(1)}%">
@@ -63,7 +76,9 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
           </button>
         </div>
       </div>
-      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>Install app</span></button><span class="keys-hint">Arrows or WASD to move · Z undo · Q/E turn</span></div>
+      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>Install app</span></button></div>
+      </div>
+      <p class="keys-hint"><kbd>WASD</kbd> or arrows to move · <kbd>Z</kbd> undo · <kbd>Q</kbd><kbd>E</kbd> turn</p>
     </div>
     <span class="title-version">v${__APP_VERSION__}</span>`,
   );

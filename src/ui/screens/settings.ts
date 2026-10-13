@@ -13,13 +13,19 @@ export function showSettings(
     'div',
     'modal',
     `<div class="card settings-card">
-      <h2>Settings</h2>
-      ${row('muted', 'Sound effects', !s.muted)}
-      ${slider('sfxVolume', 'Effects volume')}
-      ${row('music', 'Music', s.music)}
-      ${slider('musicVolume', 'Music volume')}
-      ${row('ghost', 'Ghost of your best run', s.ghost)}
-      ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}
+      <div class="card-head"><h2>Settings</h2><button class="icon-btn" data-done aria-label="Close">${icon('close', 18)}</button></div>
+      <h3 class="set-group">${icon('sound', 15)} Sound</h3>
+      <div class="set-list">
+        ${row('muted', 'Sound effects', !s.muted)}
+        ${slider('sfxVolume', 'Effects volume')}
+        ${row('music', 'Music', s.music)}
+        ${slider('musicVolume', 'Music volume')}
+      </div>
+      <h3 class="set-group">${icon('gamepad', 15)} Play</h3>
+      <div class="set-list">
+        ${row('ghost', 'Ghost of your best run', s.ghost)}
+        ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}
+      </div>
       ${hooks.install === 'prompt' ? `<button class="big-btn ghost" data-install>${icon('download', 16)} Install the app</button>` : ''}
       ${hooks.install === 'ios' ? `<button class="big-btn ghost" data-install-help>${icon('download', 16)} Install the app</button>` : ''}
       <button class="big-btn ghost danger" data-reset>${icon('replay', 16)} Reset progress</button>

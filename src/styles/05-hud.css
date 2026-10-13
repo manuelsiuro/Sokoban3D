@@ -24,16 +24,19 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 6px 14px;
-  border-radius: 16px;
+  justify-content: center;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 14px;
   background: var(--glass-strong);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .hud-title small {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -41,18 +44,31 @@
 .hud-title b {
   display: block;
   overflow: hidden;
-  font: 600 17px var(--font-display);
+  font: 600 17px/1.15 var(--font-display);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.hud-moves {
+/* Moves against par: the count big, the par beside it. */
+.hud-moves.pill.big {
   margin-left: auto;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 14px;
   font-variant-numeric: tabular-nums;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.hud-moves b {
+  min-width: 1.2ch;
+  font: 700 24px/1 var(--font-display);
+  text-align: right;
 }
 
 .hud-moves small {
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 
@@ -62,20 +78,33 @@
   left: max(12px, env(safe-area-inset-left));
   bottom: max(12px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .hud-bar .icon-btn {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  box-shadow: 0 1px 2px rgba(20, 50, 90, 0.12);
 }
 
 .hud-bar .icon-btn[disabled] {
-  opacity: 0.45;
+  opacity: 0.4;
+  box-shadow: none;
 }
 
 .hud-bar .sep {
-  width: 6px;
+  align-self: center;
+  width: 1px;
+  height: 26px;
+  margin: 0 5px;
+  background: rgba(18, 35, 58, 0.15);
 }
 
 .hud-tip {
@@ -84,43 +113,63 @@
   bottom: max(76px, calc(env(safe-area-inset-bottom) + 76px));
   max-width: min(520px, calc(100vw - 32px));
   transform: translateX(-50%);
-  padding: 10px 16px;
-  border-radius: 14px;
+  margin: 0;
+  padding: 10px 16px 10px 40px;
+  border-radius: 16px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.35;
-  text-align: center;
-  background: var(--glass-strong);
-  box-shadow: var(--shadow);
-  transition: opacity 0.4s var(--ease);
+  text-align: left;
+  background: var(--glass-strong) no-repeat 13px 50% / 18px
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f2a51f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4'/%3E%3Cpath d='M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z' fill='%23fff3c4'/%3E%3C/svg%3E");
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--spring);
 }
 
 .hud-tip.gone {
   opacity: 0;
+  transform: translate(-50%, 8px);
 }
 
+/* The keyboard legend: quiet until the mouse comes near. */
 .hud-keys {
   position: absolute;
   right: max(14px, env(safe-area-inset-right));
-  bottom: max(18px, env(safe-area-inset-bottom));
-  font-size: 12px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  font-size: 11.5px;
+  font-weight: 500;
   color: var(--ink-soft);
   text-align: right;
-  line-height: 1.6;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.55);
+  line-height: 1.75;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  opacity: 0.72;
+  pointer-events: auto;
+  transition: opacity 0.2s;
+}
+
+.hud-keys:hover {
+  opacity: 1;
 }
 
 .hud-keys kbd {
   display: inline-block;
-  min-width: 20px;
-  padding: 0 5px;
+  min-width: 18px;
+  margin: 0 1px;
+  padding: 0 4px;
   border-radius: 5px;
-  font: 600 11px var(--font-ui);
+  font: 700 10.5px/17px var(--font-ui);
   text-align: center;
-  background: var(--glass-strong);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+  color: var(--ink);
+  text-shadow: none;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 0 rgba(18, 35, 58, 0.2);
+}
+
+/* Small windows: the legend would crowd the island. */
+@media (max-width: 900px), (max-height: 600px) {
+  .hud-keys {
+    display: none;
+  }
 }
 
 /* Touch d-pad, bottom right. */
@@ -137,7 +186,9 @@
 .dpad button {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
   touch-action: none;
   display: grid;
   place-items: center;
@@ -165,6 +216,17 @@
   .hud-bar {
     flex-wrap: wrap;
     width: 166px;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .hud-bar .icon-btn {
+    width: 50px;
+    height: 50px;
+    box-shadow: var(--shadow);
   }
   .hud-bar .sep {
     display: none;
@@ -179,7 +241,9 @@
     left: max(12px, env(safe-area-inset-left));
     max-width: min(260px, 30vw);
     transform: none;
-    text-align: left;
+  }
+  .hud-tip.gone {
+    transform: translateY(-6px);
   }
 }
 

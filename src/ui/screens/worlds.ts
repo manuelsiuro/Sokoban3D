@@ -37,7 +37,8 @@ export interface MapHooks {
 }
 
 const pips = (n: number) => `<span class="level-diff" title="Difficulty ${n} of 5">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
-const card = (l: LevelCard, i: number) => `<button class="level-card ${l.unlocked ? '' : 'locked'}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
+const state = (l: LevelCard, next: boolean) => (!l.unlocked ? 'locked' : l.stars >= 3 ? 'solved perfect' : l.stars ? 'solved' : next ? 'next' : '');
+const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="level-card ${state(l, all.find((x) => x.unlocked && !x.stars) === l)}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
     <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
     ${l.clean ? `<span class="level-badge" title="Solved without undo">${icon('feather', 18)}</span>` : ''}
     <span class="level-name">${l.name}</span>
@@ -63,7 +64,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       <span class="pill big">${icon('star', 16)} ${total} / ${max}</span>
     </div>
     <div class="world-card"></div>
-    <div class="sheet hidden"><div class="sheet-inner"></div></div>`,
+    <div class="sheet hidden"><i class="sheet-grip" aria-hidden="true"></i><div class="sheet-inner"></div></div>`,
   );
   const cardEl = el.querySelector<HTMLElement>('.world-card')!;
   const sheet = el.querySelector<HTMLElement>('.sheet')!;
@@ -88,7 +89,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
       </div>
       <button class="icon-btn world-next" data-step="1" aria-label="Next world" ${k === worlds.length - 1 ? 'disabled' : ''}>${icon('chevronRight')}</button>`;
     sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${w.mechanic}</small></h3><button class="icon-btn" data-close aria-label="Close">${icon('close')}</button></div>
-      <div class="level-grid">${w.levels.map(card).join('')}</div>`;
+      <div class="level-grid">${w.levels.map((l, i) => card(l, i, w.levels)).join('')}</div>`;
   };
   const go = (to: number) => {
     if (to < 0 || to >= worlds.length || to === k) return;
