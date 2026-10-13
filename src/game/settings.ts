@@ -21,6 +21,8 @@ export interface Settings {
   shake: boolean;
   /** Render quality: auto adapts to the device. */
   quality: Quality;
+  /** Vibrate on pushes, goals and wins (phones). */
+  haptics: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ghost: true,
   shake: true,
   quality: 'auto',
+  haptics: true,
 };
 
 export function loadSettings(): Settings {

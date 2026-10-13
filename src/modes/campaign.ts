@@ -1,10 +1,9 @@
 import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
 import type { LevelDef } from '../levels/types';
-import { click, map, newTrophies, par, screen, settings, sound, view, worldIndex } from '../app/context';
+import { click, map, newTrophies, par, screen, settings, sound, summary, view, worldIndex } from '../app/context';
 import { isUnlocked, isWorldOpen, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
 import { starLimits, starsFor } from '../game/score';
-import { showSummary } from '../ui/screens/summary';
 import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
 
@@ -24,12 +23,12 @@ export async function levelFlow(index: number): Promise<number> {
     const extra = newTrophies();
     // Next stays inside the world; after its last level, back to the map.
     const next = index + 1 < LEVELS.length && LEVELS[index + 1].world === level.world ? index + 1 : -1;
-    let choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0, extra, watch: !!loadProgress()[level.id]?.run }, click);
+    let choice = await summary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best, clean, hasNext: next >= 0, extra, watch: !!loadProgress()[level.id]?.run });
     // Watching the best run comes back to the same summary.
     while (choice === 'watch') {
       const run = loadProgress()[level.id]?.run;
       if (run) await play(level, `${campaignLabel(level)} · replay`, p, { autoplay: run });
-      choice = await showSummary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best: false, clean, hasNext: next >= 0, extra: '', watch: true }, click);
+      choice = await summary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best: false, clean, hasNext: next >= 0, extra: '', watch: true });
     }
     if (choice === 'levels') return index;
     if (choice === 'next') {

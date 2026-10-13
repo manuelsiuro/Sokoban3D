@@ -1,7 +1,21 @@
 /**
  * Synthesized sound effects (Web Audio, no files). The context starts on the first user
  * gesture (browsers block audio before one); a volume of 0 is silence (the mute switch).
+ *
+ * Mixing: effects and music meet in a compressor; both send to a reverb whose room fits
+ * the world (a small meadow, a vast cave); the music ducks under wins and stingers.
  */
+
+/** Reverb per world: length of the tail (s) and how much of it is heard. */
+const ROOMS: Record<string, { size: number; wet: number }> = {
+  meadow: { size: 0.8, wet: 0.12 },
+  tundra: { size: 1.6, wet: 0.2 },
+  desert: { size: 1.0, wet: 0.12 },
+  sky: { size: 2.2, wet: 0.24 },
+  forge: { size: 1.2, wet: 0.2 },
+  crystal: { size: 3.0, wet: 0.34 },
+  clockwork: { size: 1.4, wet: 0.2 },
+};
 export class Sound {
   private ctx: AudioContext | null = null;
   private out: GainNode | null = null;
@@ -11,21 +25,35 @@ export class Sound {
   private theme = 'meadow';
   private noise: AudioBuffer | null = null;
   private volume = 0.8;
+  private reverb: ConvolverNode | null = null;
+  private wet: GainNode | null = null;
+  private room = '';
 
   constructor() {
     const start = () => {
       if (this.ctx) return;
       try {
-        this.ctx = new AudioContext();
-        this.out = this.ctx.createGain();
+        const c = (this.ctx = new AudioContext());
+        // effects → out ─┬→ compressor → speakers
+        //                └→ reverb send ┘ (music joins both too)
+        const master = c.createDynamicsCompressor();
+        master.threshold.value = -16;
+        master.ratio.value = 4;
+        master.connect(c.destination);
+        this.reverb = c.createConvolver();
+        this.wet = c.createGain();
+        this.reverb.connect(this.wet).connect(master);
+        this.out = c.createGain();
         this.out.gain.value = this.volume;
-        this.out.connect(this.ctx.destination);
-        const n = this.ctx.sampleRate * 0.5;
-        this.noise = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
+        this.out.connect(master);
+        this.out.connect(this.reverb);
+        const n = c.sampleRate * 0.5;
+        this.noise = c.createBuffer(1, n, c.sampleRate);
         const d = this.noise.getChannelData(0);
         for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
-        this.music = new Music(this.ctx, this.noise);
+        this.music = new Music(c, this.noise, master, this.reverb);
         this.music.set(this.musicOn ? this.musicVolume : 0, this.theme);
+        this.setRoom(this.theme);
       } catch {
         /* no audio on this device */
       }
@@ -40,6 +68,23 @@ export class Sound {
     this.musicVolume = volume;
     this.theme = theme;
     this.music?.set(on ? volume : 0, theme);
+    this.setRoom(theme);
+  }
+
+  /** The reverb of a world's space: a decaying burst of noise as its impulse response. */
+  private setRoom(world: string) {
+    const c = this.ctx;
+    if (!c || !this.reverb || !this.wet || this.room === world) return;
+    this.room = world;
+    const { size, wet } = ROOMS[world] ?? ROOMS.meadow;
+    const len = Math.floor(c.sampleRate * size);
+    const ir = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    }
+    this.reverb.buffer = ir;
+    this.wet.gain.setTargetAtTime(wet, c.currentTime, 0.2);
   }
 
   setVolume(v: number) {
@@ -132,7 +177,40 @@ export class Sound {
     this.tone(open ? 260 : 340, open ? 400 : 200, 0.18, 'sawtooth', 0.06);
   }
   win() {
+    this.music?.duck(2.2);
     [523, 659, 784, 1047, 1319].forEach((f, k) => this.tone(f, f, 0.22, 'triangle', 0.2, k * 0.09));
+    this.tone(1568, 1568, 0.6, 'sine', 0.08, 0.5);
+  }
+  /** The k-th star landing on the summary (0..2): each one higher. */
+  star(k: number) {
+    const f = [784, 988, 1319][k] ?? 784;
+    this.tone(f, f * 1.5, 0.14, 'triangle', 0.16);
+    this.tone(f * 2, f * 2, 0.3, 'sine', 0.05, 0.05);
+  }
+  /** A laser reaching its receiver. */
+  lit() {
+    this.tone(1200, 1800, 0.2, 'sine', 0.12);
+    this.tone(2400, 2400, 0.35, 'sine', 0.04, 0.08);
+  }
+  /** Clock gates flipping up or down. */
+  gate() {
+    this.tone(180, 140, 0.12, 'square', 0.05);
+    this.hiss(3000, 0.05, 0.1, 2, 'bandpass');
+  }
+  /** A crate sinking into lava: a hiss and a deep glug. */
+  lava() {
+    this.hiss(1400, 0.6, 0.25, 0.6, 'highpass');
+    this.tone(120, 40, 0.45, 'sine', 0.3);
+  }
+  /** A pointer over a menu button. */
+  hover() {
+    this.tone(1400, 1500, 0.025, 'sine', 0.025);
+  }
+  /** A fanfare: a world cleared or a trophy earned. */
+  stinger(kind: 'world' | 'trophy') {
+    this.music?.duck(kind === 'world' ? 2.8 : 1.6);
+    const notes = kind === 'world' ? [523, 659, 784, 1047, 784, 1047, 1319, 1568] : [880, 1109, 1319, 1760];
+    notes.forEach((f, k) => this.tone(f, f, 0.26, k % 2 ? 'sine' : 'triangle', 0.14, 0.15 + k * 0.1));
   }
 }
 
@@ -174,13 +252,30 @@ class Music {
   private timer = 0;
   private step = 3;
 
+  /** Dips under wins and stingers. */
+  private ducker: GainNode;
+
   constructor(
     private ctx: AudioContext,
     private noise: AudioBuffer,
+    master: AudioNode,
+    reverb: AudioNode,
   ) {
     this.out = ctx.createGain();
     this.out.gain.value = 0;
-    this.out.connect(ctx.destination);
+    this.ducker = ctx.createGain();
+    this.out.connect(this.ducker);
+    this.ducker.connect(master);
+    this.ducker.connect(reverb);
+  }
+
+  /** Lowers the music for a while (seconds), then brings it back. */
+  duck(seconds: number) {
+    const g = this.ducker.gain;
+    const t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(0.25, t, 0.05);
+    g.setTargetAtTime(1, t + seconds, 0.5);
   }
 
   set(volume: number, theme: string) {

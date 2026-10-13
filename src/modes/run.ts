@@ -2,6 +2,8 @@ import { EVENT, type GameState } from '../sim/Sim';
 import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
+import { buzz } from '../app/haptics';
+import { TILE } from '../sim/grid';
 import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
 import { TOUCH, h, setText } from '../ui/dom';
@@ -130,13 +132,30 @@ function present(prev: GameState, forward: boolean) {
     const e = s.events;
     if (e & EVENT.lost) sound.lost();
     else if (e & EVENT.fall) sound.fall();
-    if (e & EVENT.push) sound.push();
+    if (e & (EVENT.lost | EVENT.fall)) buzz('fall');
+    if (e & EVENT.push) {
+      sound.push();
+      buzz('push');
+    }
     else if (e & EVENT.climb) sound.climb();
     else sound.step();
-    if (e & EVENT.goalOn) sound.goal();
+    if (e & EVENT.goalOn) {
+      sound.goal();
+      buzz('goal');
+    }
     if (e & EVENT.slide) sound.slide();
     if (e & EVENT.teleport) sound.teleport();
-    if (e & EVENT.fill) sound.fill();
+    if (e & EVENT.fill) {
+      // Lava hisses; a pit just swallows.
+      const g = screen.sim.grid;
+      const inLava = s.crates.some((c, k) => c.cell >= 0 && c.cell !== prev.crates[k].cell && g.tile[c.cell] === TILE.lava && c.z === g.floor[c.cell]);
+      if (inLava) {
+        sound.lava();
+        buzz('lava');
+      } else sound.fill();
+    }
+    if (s.world.lit.length > prev.world.lit.length) sound.lit();
+    if (s.world.raised.join() !== prev.world.raised.join()) sound.gate();
     if (e & EVENT.convey) sound.convey();
     if (e & (EVENT.open | EVENT.close)) sound.door((e & EVENT.open) !== 0);
   } else sound.undo();
@@ -145,6 +164,7 @@ function present(prev: GameState, forward: boolean) {
   if (forward && s.events & EVENT.win && run) {
     run.over = true;
     sound.win();
+    buzz('win');
     view.celebrate();
     setTimeout(() => endRun(s), 1500);
   }
@@ -155,7 +175,10 @@ function move(dir: number) {
   if (!run || run.over || run.watching) return;
   const prev = screen.shown;
   if (screen.sim.move(view.screenDir(dir))) present(prev, true);
-  else sound.bump();
+  else {
+    sound.bump();
+    buzz('bump');
+  }
 }
 
 function act(a: string) {

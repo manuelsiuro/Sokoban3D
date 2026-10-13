@@ -11,6 +11,7 @@ import { decodeLevel } from './game/share';
 import { isWorldOpen, loadProgress, nextLevel, totalStars, worldLevels } from './game/progress';
 import { showTitle } from './ui/screens/title';
 import { TOUCH } from './ui/dom';
+import { setHaptics } from './app/haptics';
 import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
 import { showUpdate } from './ui/screens/update';
@@ -98,6 +99,7 @@ async function titleFlow() {
           applySound();
           view.reducedMotion = s.reducedMotion;
           view.shake = s.shake;
+          setHaptics(s.haptics);
           if (s.quality !== shownQuality) view.setQuality((shownQuality = s.quality), TOUCH);
         },
         reset: () => resetProgress(),

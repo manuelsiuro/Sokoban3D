@@ -22,7 +22,8 @@ export interface SummaryInfo {
 }
 
 /** A solved level: stars, moves against par, and what to do next. */
-export function showSummary(r: SummaryInfo, click: () => void): Promise<SummaryChoice> {
+/** `star(k)` plays as the k-th earned star lands (its animation). */
+export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number) => void): Promise<SummaryChoice> {
   const hint = r.stars < 3 ? `${r.limits[1]} moves or fewer for ★★★` : r.moves <= r.par ? 'Matched the par!' : 'Three stars';
   const notes = [r.par ? hint : '', r.best ? 'New best' : '', r.clean ? 'No undo' : ''].filter(Boolean);
   const stat = (label: string, value: number | string, cls = '') => `<span class="stat ${cls}"><b>${value}</b><small>${label}</small></span>`;
@@ -66,5 +67,6 @@ export function showSummary(r: SummaryInfo, click: () => void): Promise<SummaryC
       resolve(c);
     };
     document.body.append(el);
+    for (let k = 0; k < r.stars; k++) setTimeout(() => el.isConnected && star?.(k), (0.2 + k * 0.15 + 0.22) * 1000);
   });
 }

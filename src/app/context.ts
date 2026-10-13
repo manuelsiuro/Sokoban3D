@@ -13,6 +13,8 @@ import { loadDaily } from '../game/dailyProgress';
 import { loadProgress } from '../game/progress';
 import { TOUCH, closeOverlay, h } from '../ui/dom';
 import { icon } from '../ui/icons';
+import { showSummary, type SummaryInfo } from '../ui/screens/summary';
+import { buzz, setHaptics } from './haptics';
 
 /**
  * The long-lived objects every mode shares: settings, sound, the renderer with its two
@@ -26,6 +28,20 @@ export const applySound = () => {
 };
 applySound();
 export const click = () => sound.click();
+setHaptics(settings.haptics);
+
+// A soft tick when the mouse moves onto a button (not on touch screens: no hover there).
+if (!TOUCH) {
+  let lastHover: Element | null = null;
+  addEventListener('pointerover', (e) => {
+    const b = (e.target as HTMLElement).closest?.('button:not(:disabled), .level-card');
+    if (b && b !== lastHover) sound.hover();
+    lastHover = b ?? null;
+  });
+}
+
+/** The summary after a solve, with its sounds. */
+export const summary = (r: SummaryInfo) => showSummary(r, click, (k) => sound.star(k));
 /** A campaign level's par (its stored solution's length). */
 export const par = (index: number) => SOLUTIONS[LEVELS[index].id]?.length ?? 0;
 
@@ -63,6 +79,13 @@ export function toast(html: string, ms = 3200) {
 /** Checks achievements after a solve; returns a line for the summary (and toasts each new one). */
 export function newTrophies(): string {
   const fresh = checkAchievements({ progress: loadProgress(), daily: loadDaily() });
+  // A world cleared gets the big fanfare; other trophies a short one.
+  if (fresh.length) {
+    setTimeout(() => {
+      sound.stinger(fresh.some((a) => a.id.startsWith('world-')) ? 'world' : 'trophy');
+      buzz('win');
+    }, 900);
+  }
   fresh.forEach((a, k) => setTimeout(() => toast(`${icon('trophy', 18)} <span>${a.name}${a.reward ? ' · new look in Trophies' : ''}</span>`), 600 + k * 900));
   return fresh.length ? `${icon('trophy', 14)} ${fresh.map((a) => a.name).join(', ')}` : '';
 }
