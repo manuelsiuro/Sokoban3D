@@ -162,6 +162,14 @@ export class Atmosphere {
     }
   }
 
+  /** Clouds stop glowing at night and grey under the weather. */
+  setLight(night: number, wet: number) {
+    for (const c of this.clouds) {
+      c.m.emissiveIntensity = 0.26 * (1 - 0.85 * night) * (1 - 0.6 * wet);
+      c.m.color.setScalar(1 - 0.35 * wet);
+    }
+  }
+
   dispose() {
     this.group.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points) o.geometry.dispose();
@@ -175,7 +183,7 @@ const at = new THREE.Vector3();
 
 let dotTex: THREE.Texture | null = null;
 /** A soft round dot for the particles. */
-function dot() {
+export function dot() {
   if (dotTex) return dotTex;
   const c = document.createElement('canvas');
   c.width = c.height = 32;

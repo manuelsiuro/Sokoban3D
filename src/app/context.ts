@@ -58,6 +58,8 @@ document.body.append(renderer.domElement);
 export const view = new View(renderer);
 view.reducedMotion = settings.reducedMotion;
 view.shake = settings.shake;
+view.weather.cycle = settings.daynight;
+view.weather.enabled = settings.weather;
 symbols.on = settings.symbols;
 view.setQuality(settings.quality, TOUCH);
 export const map = new MapView(renderer, WORLDS);

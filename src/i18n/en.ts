@@ -63,6 +63,8 @@ export const en = {
   "settings.haptics": "Vibration",
   "settings.reducedMotion": "Reduced motion",
   "settings.graphics": "Graphics",
+  "settings.daynight": "Day and night",
+  "settings.weather": "Weather",
   "settings.quality": "Quality",
   "settings.now": "now: {tier}",
   "settings.q.auto": "Auto",

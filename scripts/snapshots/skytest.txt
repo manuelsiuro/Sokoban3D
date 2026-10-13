@@ -1,0 +1,8 @@
+meadow     least light 0.30  darkest horizon 0.37  biggest step 0.007
+tundra     least light 0.31  darkest horizon 0.37  biggest step 0.007
+desert     least light 0.31  darkest horizon 0.36  biggest step 0.008
+sky        least light 0.31  darkest horizon 0.37  biggest step 0.007
+forge      least light 0.71  darkest horizon 0.24  biggest step 0.004
+crystal    least light 0.76  darkest horizon 0.26  biggest step 0.004
+clockwork  least light 0.31  darkest horizon 0.34  biggest step 0.006
+reverse    least light 0.33  darkest horizon 0.33  biggest step 0.006

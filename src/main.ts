@@ -2,7 +2,7 @@ import './styles/index.css';
 import './app/boot';
 import { LEVELS } from './levels/levels';
 import { WORLDS } from './levels/worlds';
-import { applyLook, applySound, click, map, newTrophies, screen, settings, showLevel, toast, view, worldIndex } from './app/context';
+import { applyLook, applySound, click, map, newTrophies, screen, settings, showLevel, sound, toast, view, worldIndex } from './app/context';
 import { resetProgress, saveSettings } from './game/settings';
 import { ACHIEVEMENTS, builtOne, earned, unlockedCosmetics } from './game/achievements';
 import { today } from './game/daily';
@@ -48,6 +48,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
   if (screen.mode === 'map') map.draw(now / 1000);
   else view.draw(now / 1000);
+  sound.ambience(screen.mode === 'level' ? view.weather.ambience : null);
 }
 requestAnimationFrame(frame);
 
@@ -131,6 +132,8 @@ async function titleFlow() {
           applySound();
           view.reducedMotion = s.reducedMotion;
           view.shake = s.shake;
+          view.weather.cycle = s.daynight;
+          view.weather.enabled = s.weather;
           setLang(s.lang);
           symbols.on = s.symbols;
           setHaptics(s.haptics);

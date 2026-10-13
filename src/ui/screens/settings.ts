@@ -8,7 +8,7 @@ export function showSettings(
   s: Settings,
   hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void; tier?: string },
 ): Promise<void> {
-  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics' | 'symbols' | 'stuck', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
+  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics' | 'symbols' | 'stuck' | 'daynight' | 'weather', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const body = () => `<div class="card settings-card">
       <div class="card-head"><h2>${t('settings.title')}</h2><button class="icon-btn" data-done aria-label="${t('common.close')}">${icon('close', 18)}</button></div>
@@ -31,6 +31,8 @@ export function showSettings(
       </div>
       <h3 class="set-group">${icon('star', 15)} ${t('settings.graphics')}</h3>
       <div class="set-list">
+        ${row('daynight', t('settings.daynight'), s.daynight)}
+        ${row('weather', t('settings.weather'), s.weather)}
         <label class="set-row"><span>${t('settings.quality')}${hooks.tier ? ` <small class="set-note">${t('settings.now', { tier: t(`settings.q.${hooks.tier}` as Key) })}</small>` : ''}</span><select data-k="quality">${(['auto', 'high', 'medium', 'low'] as const).map((q) => `<option value="${q}" ${s.quality === q ? 'selected' : ''}>${t(`settings.q.${q}`)}</option>`).join('')}</select></label>
         <label class="set-row"><span>${t('settings.language')}</span><select data-k="lang">${(['auto', 'en', 'fr'] as const).map((l) => `<option value="${l}" ${s.lang === l ? 'selected' : ''}>${l === 'auto' ? t('settings.lang.auto') : l === 'en' ? 'English' : 'Français'}</option>`).join('')}</select></label>
       </div>

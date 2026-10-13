@@ -29,6 +29,10 @@ export class Sound {
   private reverb: ConvolverNode | null = null;
   private wet: GainNode | null = null;
   private room = '';
+  /** Looping beds for the weather (made on first use), and when the next cricket chirps. */
+  private beds: { rain: GainNode; wind: GainNode; windTone: BiquadFilterNode } | null = null;
+  private bedLevel = { rain: 0, wind: 0 };
+  private chirpAt = 0;
 
   constructor() {
     const start = () => {
@@ -140,6 +144,68 @@ export class Sound {
     src.loop = true;
     src.start(t, Math.random() * 0.3);
     src.stop(t + dur + 0.02);
+  }
+
+  /**
+   * The weather and the night, heard: rain, wind (snow and sand storms), crickets. Called every
+   * frame with amounts 0..1 (null: quiet, e.g. on the world map); goes through the effects
+   * volume, so the mute switch silences it too.
+   */
+  ambience(a: { rain: number; wind: number; crickets: number } | null) {
+    const c = this.ctx;
+    if (!c || !this.out || c.state !== 'running') return;
+    const rain = a?.rain ?? 0;
+    const wind = a?.wind ?? 0;
+    if (!this.beds) {
+      if (rain < 0.01 && wind < 0.01) return this.chirp(a?.crickets ?? 0);
+      // Four seconds of noise, so the loop can't be heard.
+      const len = c.sampleRate * 4;
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        // A little low-passed: softer than white noise.
+        last = last * 0.6 + (Math.random() * 2 - 1) * 0.4;
+        d[i] = last * 1.6;
+      }
+      const bed = (filter: BiquadFilterType, freq: number, q: number) => {
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const f = c.createBiquadFilter();
+        f.type = filter;
+        f.frequency.value = freq;
+        f.Q.value = q;
+        const g = c.createGain();
+        g.gain.value = 0;
+        src.connect(f).connect(g).connect(this.out!);
+        src.start(0, Math.random() * 4);
+        return { g, f };
+      };
+      const r = bed('bandpass', 2400, 0.35);
+      const w = bed('bandpass', 380, 1.4);
+      this.beds = { rain: r.g, wind: w.g, windTone: w.f };
+    }
+    const t = c.currentTime;
+    const set = (node: GainNode, key: 'rain' | 'wind', v: number) => {
+      if (Math.abs(this.bedLevel[key] - v) < 0.004) return;
+      this.bedLevel[key] = v;
+      node.gain.setTargetAtTime(v, t, 0.6);
+    };
+    set(this.beds.rain, 'rain', rain * 0.16);
+    set(this.beds.wind, 'wind', wind * 0.2);
+    // The wind rises and falls.
+    this.beds.windTone.frequency.setTargetAtTime(320 + 160 * Math.sin(t * 0.37) + 90 * Math.sin(t * 1.1), t, 0.3);
+    this.chirp(a?.crickets ?? 0);
+  }
+
+  /** Now and then a cricket: three quick high pulses. */
+  private chirp(amount: number) {
+    const c = this.ctx;
+    if (!c || amount < 0.05 || c.currentTime < this.chirpAt) return;
+    this.chirpAt = c.currentTime + 0.4 + Math.random() * 1.6;
+    const f = 4100 + Math.random() * 600;
+    for (let i = 0; i < 3; i++) this.tone(f, f * 0.98, 0.035, 'sine', 0.018 * amount, i * 0.055);
   }
 
   click() {

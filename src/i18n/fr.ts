@@ -65,6 +65,8 @@ export const fr: Partial<Strings> = {
   "settings.haptics": "Vibrations",
   "settings.reducedMotion": "Animations réduites",
   "settings.graphics": "Graphismes",
+  "settings.daynight": "Jour et nuit",
+  "settings.weather": "Météo",
   "settings.quality": "Qualité",
   "settings.now": "actuelle : {tier}",
   "settings.q.auto": "Auto",

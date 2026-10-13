@@ -27,6 +27,10 @@ export interface Settings {
   symbols: boolean;
   /** Warn when a crate can never reach a pad any more. */
   stuck: boolean;
+  /** The day goes round to night and back (off: always day). */
+  daynight: boolean;
+  /** Rain, snow, sand and ash storms come by now and then. */
+  weather: boolean;
   /** Language: auto follows the browser. */
   lang: 'auto' | 'en' | 'fr';
 }
@@ -45,6 +49,8 @@ export const DEFAULT_SETTINGS: Settings = {
   haptics: true,
   symbols: true,
   stuck: true,
+  daynight: true,
+  weather: true,
   lang: 'auto',
 };
 

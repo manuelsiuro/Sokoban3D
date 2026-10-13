@@ -11,6 +11,7 @@ import { Post, type Quality } from './post';
 import { clock, iceShader, lavaShader } from './shaders';
 import { bake, plain, roughen, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
+import { Weather } from './weather';
 import { CRATE_COLORS, Mechanics, dressCrate, symbolMesh, tileColor } from './mechanics';
 import { PlanetShape } from './planet';
 import { CRATE, crateModel, decorModel, disposeTree, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
@@ -146,6 +147,11 @@ export class View {
   private printNext = 0;
   /** Rings that spread over a pad when a crate lands on it. */
   private ripples: { m: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; at: number }[] = [];
+  /** Time of day and weather (the clock runs on across levels). */
+  readonly weather = new Weather();
+  /** A warm glow round the pusher at night. */
+  private lantern = new THREE.PointLight(0xffc27a, 0, 6, 1.4);
+  private skyShown = { top: -1, bottom: -1 };
 
   constructor(readonly renderer: THREE.WebGLRenderer) {
     renderer.shadowMap.enabled = true;
@@ -160,7 +166,9 @@ export class View {
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.02;
     this.root.add(this.world, this.player.group);
-    this.scene.add(this.hemi, this.sun, this.sun.target, this.root);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.root, this.weather.group);
+    this.lantern.position.set(0, 1.15, 0.1);
+    this.player.group.add(this.lantern);
     this.addXray();
     this.post = new Post(renderer, this.scene, this.camera);
     this.post.onTier = (t) => {
@@ -510,6 +518,9 @@ export class View {
     sc.updateProjectionMatrix();
     this.sun.position.set(-8, 16, 10);
     this.sun.target.position.set(0, 0, 0);
+    this.weather.setBiome(b, this.planet ? this.planet.radius + 3 : Math.max(grid.w, grid.h) / 2 + 1, !!this.planet, this.now, this.post.current !== 'high');
+    this.skyShown = { top: -1, bottom: -1 };
+    this.applySky(0);
     this.show(state, null);
     this.shownYaw = this.yaw;
   }
@@ -1165,6 +1176,7 @@ export class View {
       for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
     }
     this.placeCamera(dt);
+    this.applySky(dt);
     // Glide the picture up or down (a view offset, so nothing else about the camera changes).
     // On a tall screen a planet also sits a little higher, clear of the touch controls.
     const goal = this.raise || (this.planet && this.camera.aspect < 0.8 ? 0.1 : 0);
@@ -1174,6 +1186,28 @@ export class View {
     else if (was) this.camera.clearViewOffset();
     clock.value = time;
     this.post.render(this.scene, this.camera, time);
+  }
+
+  /** The time of day and the weather: sky, fog, the sun (or moon), the night's lantern. */
+  private applySky(dt: number) {
+    const s = this.weather.update(this.now, dt, this.camera, this.reducedMotion);
+    if (s.top !== this.skyShown.top || s.bottom !== this.skyShown.bottom) {
+      this.skyShown = { top: s.top, bottom: s.bottom };
+      this.sky = skyTexture(s.top, s.bottom, this.skyCanvas, this.sky ?? undefined);
+      this.scene.background = this.sky;
+    }
+    this.fog.color.set(s.fog);
+    this.fog.far = this.fog.near + (this.fog.far - this.fog.near) * s.fogScale;
+    this.hemi.color.set(s.hemi);
+    this.hemi.groundColor.set(s.hemiGround);
+    this.hemi.intensity = s.hemiIntensity;
+    this.sun.color.set(s.light);
+    this.sun.intensity = s.lightIntensity;
+    const [x, y, z] = s.lightDir;
+    this.sun.position.set(x * 20, y * 20, z * 20);
+    // Softer on a planet: the camera rides close behind the pusher there.
+    this.lantern.intensity = s.night * (this.planet ? 0.9 : 2.2);
+    this.air?.setLight(s.night, this.weather.wet);
   }
 
   private placeCamera(dt: number) {

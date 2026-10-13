@@ -41,7 +41,16 @@ export interface Biome {
   air: Atmosphere;
   /** Soft ground (snow, sand): the pusher leaves footprints of this color, fading. */
   prints?: number;
+  /** How much the day turns to night here, 0..1 (default 1; dark worlds change less). */
+  cycle?: number;
+  /** The weather that sometimes comes by, and the color it greys the sky with. */
+  weather?: { kind: WeatherKind; tint?: number };
+  /** What comes out at night. */
+  nightLife?: 'fireflies' | 'aurora';
 }
+
+/** Rain (with a rainbow after, by day), a blizzard, a sandstorm, falling ash. */
+export type WeatherKind = 'rain' | 'snow' | 'sand' | 'ash';
 
 export const BIOMES: Record<string, Biome> = {
   meadow: {
@@ -51,6 +60,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xd29a55, crateTrim: 0x8c5a2b, goal: 0xffd447,
     sun: 0xfff1d6, sunIntensity: 2.4, ambient: 1.25,
     decor: ['tree', 'tree', 'bush', 'flower', 'flower', 'flower', 'grass', 'grass', 'rock', 'mushroom'],
+    weather: { kind: 'rain' }, nightLife: 'fireflies',
     air: { clouds: { top: 0xffffff, belly: 0xc6d8ea, count: 9 }, motes: { color: 0xfff6c8, count: 40, rise: 0.08, size: 0.07, glow: false }, far: 'islands' },
   },
   tundra: {
@@ -61,6 +71,7 @@ export const BIOMES: Record<string, Biome> = {
     sun: 0xf2f6ff, sunIntensity: 2.2, ambient: 1.4,
     decor: ['pine', 'pine', 'pine', 'snowRock', 'snowRock'],
     prints: 0x8fa9c6,
+    weather: { kind: 'snow', tint: 0xc4d0e0 }, nightLife: 'aurora',
     air: { clouds: { top: 0xffffff, belly: 0xbccbe0, count: 8 }, motes: { color: 0xffffff, count: 260, rise: -0.6, size: 0.09, glow: false }, far: 'islands' },
   },
   desert: {
@@ -71,6 +82,7 @@ export const BIOMES: Record<string, Biome> = {
     sun: 0xffe2b0, sunIntensity: 2.6, ambient: 1.15,
     decor: ['cactus', 'cactus', 'pillar', 'rock', 'grass'],
     prints: 0xb98a4c,
+    weather: { kind: 'sand', tint: 0xd9a86a },
     air: { clouds: { top: 0xfff8ea, belly: 0xf0c99a, count: 5 }, motes: { color: 0xffe2a8, count: 60, rise: 0.05, size: 0.06, glow: false }, far: 'islands' },
   },
   sky: {
@@ -80,6 +92,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xe0b06a, crateTrim: 0x94652f, goal: 0xff8fd0,
     sun: 0xfff3e6, sunIntensity: 2.2, ambient: 1.35,
     decor: ['cloud', 'cloud', 'tree', 'bush', 'flower', 'flower'],
+    weather: { kind: 'rain', tint: 0xa8a6c8 }, nightLife: 'fireflies',
     air: { clouds: { top: 0xffffff, belly: 0xd9cdf2, count: 14 }, motes: { color: 0xffffff, count: 40, rise: 0.1, size: 0.07, glow: true }, far: 'islands' },
   },
   forge: {
@@ -89,6 +102,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0x9b6f4a, crateTrim: 0x4a4d55, goal: 0xff9a3d,
     sun: 0xffb27a, sunIntensity: 2.0, ambient: 0.9,
     decor: ['basalt', 'basalt', 'ember', 'ember', 'rock'],
+    cycle: 0.45, weather: { kind: 'ash', tint: 0x4a3c3c },
     air: { clouds: { top: 0x5a4a4e, belly: 0x2a1e22, count: 7 }, motes: { color: 0xff8a2a, count: 140, rise: 0.7, size: 0.08, glow: true } },
   },
   crystal: {
@@ -98,6 +112,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xc9a46b, crateTrim: 0x7a5a30, goal: 0x7dffd6,
     sun: 0xcfd8ff, sunIntensity: 1.8, ambient: 1.0,
     decor: ['crystal', 'crystal', 'crystal', 'mushroom', 'rock'],
+    cycle: 0.35,
     air: { motes: { color: 0x9bf0ff, count: 120, rise: 0.12, size: 0.08, glow: true }, far: 'shards' },
   },
   clockwork: {
@@ -107,6 +122,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0x8c6a4a, crateTrim: 0x4f3a26, goal: 0xff8f5a,
     sun: 0xffe9c4, sunIntensity: 2.2, ambient: 1.1,
     decor: ['gear', 'gear', 'lamp', 'lamp', 'pillar'],
+    weather: { kind: 'rain', tint: 0x8f8a84 },
     air: { clouds: { top: 0xfff1d8, belly: 0xc9a98a, count: 7 }, motes: { color: 0xffd98a, count: 40, rise: 0.06, size: 0.06, glow: true }, far: 'gears' },
   },
   reverse: {
@@ -116,6 +132,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xd8a868, crateTrim: 0x7a5432, goal: 0xff8fd0,
     sun: 0xffd2c2, sunIntensity: 2.0, ambient: 1.2,
     decor: ['tree', 'bush', 'flower', 'flower', 'mushroom', 'grass'],
+    weather: { kind: 'rain', tint: 0xa898b8 }, nightLife: 'fireflies',
     air: { clouds: { top: 0xffe0ec, belly: 0xb88ab8, count: 8 }, motes: { color: 0xffc2e8, count: 90, rise: 0.1, size: 0.08, glow: true }, far: 'islands' },
   },
 };
