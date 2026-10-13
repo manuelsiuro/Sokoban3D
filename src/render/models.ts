@@ -151,6 +151,9 @@ export const CRATE_LID = CRATE / 2 - 0.012;
 export interface Pusher {
   group: THREE.Group;
   body: THREE.Group;
+  /** The head turns (looking around); the eyes squash shut to blink. */
+  head: THREE.Group;
+  eyes: THREE.Group;
   suit: THREE.MeshStandardMaterial;
   cap: THREE.MeshStandardMaterial;
   /** Shoulder pivots (left, right): turned to reach forward when pushing or pulling. */
@@ -181,7 +184,10 @@ export function playerModel(): Pusher {
     bp.setY(k, bp.getY(k) - x * x * 1.3 - z * z * 0.8);
   }
   brim.computeVertexNormals();
-  body.add(
+  // The head (cap, face, eyes) turns on its own: it looks around while the pusher waits.
+  const head = new THREE.Group();
+  body.add(head);
+  head.add(
     mesh(
       merge([
         plain(new THREE.SphereGeometry(0.2, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.71, 0)),
@@ -193,25 +199,36 @@ export function playerModel(): Pusher {
   );
   const face: THREE.BufferGeometry[] = [
     paint(new THREE.SphereGeometry(0.19, 18, 14).translate(0, 0.67, 0), skinColor),
-    // A nose, a belt with a buckle, a little backpack with a strap.
+    // A nose.
     paint(new THREE.SphereGeometry(0.035, 10, 8).translate(0, 0.625, 0.19), 0xf0b48a),
+  ];
+  // A belt with a buckle, a little backpack with a strap.
+  const gear: THREE.BufferGeometry[] = [
     paint(new THREE.TorusGeometry(0.196, 0.025, 6, 22).rotateX(Math.PI / 2).translate(0, 0.3, 0), 0x5a3a22),
     paint(new RoundedBoxGeometry(0.07, 0.05, 0.02, 1, 0.008).translate(0, 0.3, 0.215), 0xe8c060),
     paint(new RoundedBoxGeometry(0.22, 0.24, 0.1, 2, 0.04).translate(0, 0.38, -0.2), 0xd9a441),
     paint(new RoundedBoxGeometry(0.16, 0.06, 0.03, 1, 0.01).translate(0, 0.43, -0.255), 0xb8862f),
   ];
   const shine: THREE.BufferGeometry[] = [];
+  // The eyes close by squashing round their middle (y 0.665): a blink.
+  const eyes = new THREE.Group();
+  eyes.position.y = 0.665;
+  const look: THREE.BufferGeometry[] = [];
   for (const x of [-0.07, 0.07]) {
     // Eyes with a glint, rosy cheeks.
-    face.push(paint(new THREE.SphereGeometry(0.045, 12, 10).scale(1, 1.15, 0.8).translate(x, 0.665, 0.165), 0xffffff));
-    face.push(paint(new THREE.SphereGeometry(0.026, 10, 8).translate(x, 0.665, 0.198), 0x1a1a24));
+    look.push(paint(new THREE.SphereGeometry(0.045, 12, 10).scale(1, 1.15, 0.8).translate(x, 0, 0.165), 0xffffff));
+    look.push(paint(new THREE.SphereGeometry(0.026, 10, 8).translate(x, 0, 0.198), 0x1a1a24));
     face.push(paint(new THREE.SphereGeometry(0.03, 8, 6).translate(x * 1.57, 0.6, 0.15), 0xff9c8a));
-    shine.push(plain(new THREE.SphereGeometry(0.009, 6, 4).translate(x + 0.01, 0.678, 0.221)));
+    shine.push(plain(new THREE.SphereGeometry(0.009, 6, 4).translate(x + 0.01, 0.013, 0.221)));
   }
-  body.add(mesh(merge(face), mat(0xffffff, { rough: 0.6, vertexColors: true })));
+  const skinMat = mat(0xffffff, { rough: 0.6, vertexColors: true });
+  head.add(mesh(merge(face), skinMat));
+  body.add(mesh(merge(gear), skinMat));
+  eyes.add(mesh(merge(look), skinMat));
   const glint = mesh(merge(shine), mat(0xffffff, { emissive: 0xffffff, emissiveIntensity: 1, rough: 0.2 }));
   glint.castShadow = false;
-  body.add(glint);
+  eyes.add(glint);
+  head.add(eyes);
   // Arms: a sleeve and a hand, hanging from the shoulder pivot.
   const arms: THREE.Group[] = [];
   const sleeve = new THREE.CapsuleGeometry(0.048, 0.12, 3, 8).translate(0, -0.08, 0);
@@ -235,7 +252,7 @@ export function playerModel(): Pusher {
     body.add(l);
     legs.push(l);
   }
-  return { group: g, body, suit, cap, arms, legs };
+  return { group: g, body, head, eyes, suit, cap, arms, legs };
 }
 
 /**

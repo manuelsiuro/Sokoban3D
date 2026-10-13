@@ -25,6 +25,8 @@ export interface Settings {
   haptics: boolean;
   /** Shapes on colored crates, goals, plates and doors (for color blindness). */
   symbols: boolean;
+  /** Warn when a crate can never reach a pad any more. */
+  stuck: boolean;
   /** Language: auto follows the browser. */
   lang: 'auto' | 'en' | 'fr';
 }
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 'auto',
   haptics: true,
   symbols: true,
+  stuck: true,
   lang: 'auto',
 };
 

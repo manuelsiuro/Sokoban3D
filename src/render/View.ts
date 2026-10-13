@@ -31,6 +31,7 @@ interface Tween {
 }
 
 const Y = new THREE.Vector3(0, 1, 0);
+const STUCK_TINT = new THREE.Color(0xe0442f);
 const qYaw = (a: number, out = new THREE.Quaternion()) => out.setFromAxisAngle(Y, a);
 
 const hash = (s: string) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
@@ -68,6 +69,12 @@ export class View {
   private lookUp = new THREE.Vector3(0, 0, -1);
   private lookSide = new THREE.Vector3();
   private lookDist = 10;
+  /** Photo mode (islands): the camera orbits the island where the player turns it (yaw, pitch, zoom, and the eased copies shown). */
+  private photoOn = false;
+  private photoAim = { yaw: 0, pitch: 1, zoom: 1 };
+  private photoShown = { yaw: 0, pitch: 1, zoom: 1 };
+  /** What photo mode hid (the ghost, the hint arrow), to show again after. */
+  private photoHid: THREE.Object3D[] = [];
   overview = false;
   /** Raises the picture by this fraction of the screen's height (a sheet covers the bottom: the Planets list). */
   raise = 0;
@@ -132,6 +139,13 @@ export class View {
   private tq = new THREE.Quaternion();
   private onGoal: boolean[] = [];
   private covered = new Set<number>();
+  /** Crates that can't reach a pad any more (they glow red), and when each was flagged (it shudders). */
+  private stuck = new Map<number, number>();
+  /** Footprints on snow and sand: a pool of boot pairs, each fading after a while. */
+  private prints: { m: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; at: number }[] = [];
+  private printNext = 0;
+  /** Rings that spread over a pad when a crate lands on it. */
+  private ripples: { m: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; at: number }[] = [];
 
   constructor(readonly renderer: THREE.WebGLRenderer) {
     renderer.shadowMap.enabled = true;
@@ -244,6 +258,8 @@ export class View {
     this.root.position.set(0, 0, 0);
     this.fx.clear();
     this.crateStop = [];
+    this.stuck.clear();
+    for (const q of [...this.prints, ...this.ripples]) q.m.visible = false;
     this.shakeAmp = 0;
     const R = rng(hash(level.id));
     // Sky, fog and light.
@@ -639,6 +655,7 @@ export class View {
       const at = (cell: number, z: number, y = 0.05) => this.lift(cell, z, y);
       // A puff where the pusher took off; dust behind anything sliding on ice.
       this.fx.emit(at(prev.cell, prev.z), 0xffffff, 2, 0.5, 'puff', { size: 0.8 });
+      if (s.cell !== prev.cell) this.footprint(prev.cell, prev.z, s.facing);
       if (s.events & EVENT.slide) {
         s.crates.forEach((c, k) => {
           const was = prev.crates[k];
@@ -669,7 +686,10 @@ export class View {
       if (s.events & EVENT.goalOn) {
         const k = s.pushed;
         const c = s.crates[k];
-        if (c && c.cell >= 0) this.burst(this.lift(c.cell, c.z, 0.3), this.biome.goal, 14, 2.2);
+        if (c && c.cell >= 0) {
+          this.burst(this.lift(c.cell, c.z, 0.3), this.biome.goal, 14, 2.2);
+          this.ripple(c.cell, c.z, this.biome.goal);
+        }
       }
     }
     this.mech?.setState(s);
@@ -826,6 +846,56 @@ export class View {
     this.fx.emit(at, color, n, speed, 'shard');
   }
 
+  /** Flags the crates that can never reach a pad (indices; [] clears). */
+  setStuck(ks: number[]) {
+    for (const k of [...this.stuck.keys()]) if (!ks.includes(k)) this.stuck.delete(k);
+    for (const k of ks) if (!this.stuck.has(k)) this.stuck.set(k, this.now + this.dur);
+  }
+
+  /** Boot prints where the pusher stood, pointing the way it went (snow and sand, plain floor only). */
+  private footprint(cell: number, z: number, dir: number) {
+    const color = this.biome.prints;
+    const g = this.grid;
+    if (color === undefined || !g || cell < 0 || g.tile[cell] !== TILE.plain || g.goal[cell] || z !== g.floor[cell]) return;
+    if (this.prints.length < 24) {
+      // Two little ovals, side by side, the right one a step ahead (the model looks along +z).
+      const boot = (x: number, zz: number) => new THREE.CircleGeometry(0.07, 12).scale(1, 1.4, 1).rotateX(-Math.PI / 2).translate(x, 0, zz);
+      const geo = mergeGeometries([boot(-0.09, -0.06), boot(0.09, 0.08)]);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+      m.renderOrder = 1;
+      this.root.add(m);
+      this.prints.push({ m, at: 0 });
+    }
+    const q = this.prints[this.printNext++ % this.prints.length];
+    q.m.material.color.set(color);
+    this.lift(cell, z, 0.02, q.m.position);
+    const yaw = ((6 - dir) % 4) * (Math.PI / 2);
+    if (this.planet) q.m.quaternion.copy(this.planet.frame(cell)).multiply(qYaw(yaw));
+    else q.m.rotation.set(0, yaw, 0);
+    q.at = this.now;
+    q.m.visible = true;
+  }
+
+  /** A ring of light spreading over a pad (a crate just landed on it), after the move's animation. */
+  private ripple(cell: number, z: number, color: number) {
+    if (this.reducedMotion) return;
+    let r = this.ripples.find((q) => !q.m.visible);
+    if (!r) {
+      const m = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.5, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      m.renderOrder = 3;
+      this.root.add(m);
+      r = { m, at: 0 };
+      this.ripples.push(r);
+    }
+    r.m.material.color.set(color);
+    this.lift(cell, z, 0.06, r.m.position);
+    if (this.planet) r.m.quaternion.copy(this.planet.frame(cell));
+    else r.m.quaternion.identity();
+    r.at = this.now + this.dur * 0.8;
+    r.m.visible = true;
+    r.m.scale.setScalar(0.001);
+  }
+
   /** Confetti over the island when it's solved. */
   celebrate() {
     if (!this.grid || this.reducedMotion) return;
@@ -947,6 +1017,26 @@ export class View {
       a.rotation.z = side * (0.18 - this.reach * 0.1);
     });
     p.legs.forEach((l, k) => (l.rotation.x = swing * (k ? 0.7 : -0.7)));
+    // Waiting about: a blink now and then; after a few still seconds it glances around, and
+    // after a long wait it has a big stretch.
+    const still = this.playerTween || this.wonAt >= 0 ? 0 : time - (this.t0 + this.dur);
+    const b = time % 3.7;
+    let lids = b < 0.14 ? Math.max(0.1, Math.abs(1 - b / 0.07)) : 1;
+    let glance = 0;
+    if (!this.reducedMotion && still > 3) glance = 0.55 * Math.sin((still - 3) * 0.9) * Math.min(1, still - 3);
+    const phase = still > 16 ? (still - 16) % 14 : -1;
+    if (!this.reducedMotion && phase >= 0 && phase < 1.8) {
+      const k = Math.sin((Math.PI * phase) / 1.8);
+      p.arms.forEach((a, i) => {
+        a.rotation.x = -2.7 * k;
+        a.rotation.z = (i ? 1 : -1) * (0.18 + 0.25 * k);
+      });
+      p.body.rotation.x = -0.12 * k;
+      lids = Math.min(lids, 1 - 0.75 * k);
+      glance *= 1 - k;
+    }
+    p.eyes.scale.y = lids;
+    p.head.rotation.y += (glance - p.head.rotation.y) * Math.min(1, dt * 5);
     if (this.wonAt >= 0 && !this.reducedMotion) {
       const w = time - this.wonAt;
       if (w < 1.2) {
@@ -1004,10 +1094,48 @@ export class View {
       const won = this.wonAt >= 0 ? time - this.wonAt : -1;
       this.crates.forEach((c, k) => {
         const on = onGoal[k];
+        const since = this.stuck.get(k);
+        if (since !== undefined && !c.tween && time >= since) {
+          // Stuck: a slow red glow, and a shudder when it happens.
+          c.panels.emissive.set(0xff3a2a);
+          c.panels.emissiveIntensity = 0.35 + 0.2 * Math.sin(time * 4);
+          // (Stuck only happens on classic levels, where nothing else recolors a crate.)
+          if (!c.panels.userData.tinted) {
+            c.panels.color.set(c.panels.userData.base).lerp(STUCK_TINT, 0.65);
+            c.panels.userData.tinted = true;
+          }
+          const u = time - since;
+          const wiggle = u < 0.45 && !this.reducedMotion ? Math.sin(u * 50) * 0.09 * (1 - u / 0.45) : 0;
+          const cell = this.state!.crates[k].cell;
+          if (this.planet) c.group.quaternion.copy(this.planet.frame(cell)).multiply(qYaw(wiggle));
+          else c.group.rotation.set(0, wiggle, 0);
+          return;
+        }
+        if (c.panels.userData.tinted) {
+          c.panels.color.set(c.panels.userData.base);
+          c.panels.userData.tinted = false;
+        }
         c.panels.emissive.set(on ? this.biome.goal : 0x000000);
         const flash = won >= 0 ? Math.max(0, 1 - Math.abs(won - 0.25 - k * 0.14) / 0.18) : 0;
         c.panels.emissiveIntensity = on ? 0.35 + flash * 1.1 : 0;
       });
+      for (const q of this.prints) {
+        if (!q.m.visible) continue;
+        const u = (time - q.at) / 6;
+        if (u >= 1) q.m.visible = false;
+        else q.m.material.opacity = 0.7 * Math.min(1, (1 - u) * 3);
+      }
+      for (const q of this.ripples) {
+        if (!q.m.visible) continue;
+        const u = (time - q.at) / 0.7;
+        if (u < 0) continue;
+        if (u >= 1) {
+          q.m.visible = false;
+          continue;
+        }
+        q.m.scale.setScalar(0.6 + u * 1.3);
+        q.m.material.opacity = 0.85 * (1 - u) * (1 - u);
+      }
     }
     this.mech?.update(time, dt);
     if (this.ghost?.visible) {
@@ -1056,9 +1184,18 @@ export class View {
     this.camera.up.set(0, 1, 0);
     let a = this.shownYaw * (Math.PI / 2);
     let pitch = 1.08;
+    if (this.photoOn) {
+      const s = this.photoShown;
+      const k = this.reducedMotion ? 1 : Math.min(1, dt * 8);
+      s.yaw += (this.photoAim.yaw - s.yaw) * k;
+      s.pitch += (this.photoAim.pitch - s.pitch) * k;
+      s.zoom += (this.photoAim.zoom - s.zoom) * k;
+      a = s.yaw;
+      pitch = s.pitch;
+    }
     // Far enough that the island fits both ways: its depth up and down, its width across.
     // On a big island, a window of about nine cells around the pusher, kept inside the island.
-    const framed = this.follows && !this.overview && !this.orbiting;
+    const framed = this.follows && !this.overview && !this.orbiting && !this.photoOn;
     const want = framed ? { radius: 6.6, half: 5.2 } : { radius: this.radius, half: this.halfSpan };
     const glide = Math.min(1, dt * 4);
     this.aimSpan.radius += (want.radius - this.aimSpan.radius) * glide;
@@ -1074,6 +1211,7 @@ export class View {
     const c = this.aim;
     const tan = Math.tan((this.camera.fov * Math.PI) / 360);
     let dist = Math.max((this.aimSpan.radius / tan) * 0.92, (this.aimSpan.half / (tan * this.camera.aspect)) * 1.04) + 1;
+    if (this.photoOn) dist *= this.photoShown.zoom;
     // The fly-in: from high and far, easing down onto the island.
     if (this.introE >= 0) {
       const e = this.introE;
@@ -1094,7 +1232,7 @@ export class View {
     this.fog.far = dist + 50;
     this.camera.position.set(c.x + Math.sin(a) * Math.cos(pitch) * dist, c.y + Math.sin(pitch) * dist, c.z + Math.cos(a) * Math.cos(pitch) * dist);
     // On tall screens, aim a little toward the camera: the island rises above the touch controls.
-    const lift = this.camera.aspect < 1 ? 0.9 : 0;
+    const lift = this.camera.aspect < 1 && !this.photoOn ? 0.9 : 0;
     this.camera.lookAt(c.x + Math.sin(a) * lift, c.y - 0.3, c.z + Math.cos(a) * lift);
     this.shakeCamera(dt);
   }
@@ -1172,7 +1310,12 @@ export class View {
 
   /** Spins the planet under the camera by a drag of (dx, dy) pixels (turning free look on). */
   spin(dx: number, dy: number) {
-    if (!this.planet) return;
+    if (!this.planet) {
+      if (!this.photoOn) return;
+      this.photoAim.yaw -= dx * 0.008;
+      this.photoAim.pitch = Math.max(0.18, Math.min(1.45, this.photoAim.pitch + dy * 0.003));
+      return;
+    }
     this.looking = true;
     const k = 0.006;
     const right = this.lookSide.crossVectors(this.lookUp, this.lookDir).normalize();
@@ -1187,9 +1330,60 @@ export class View {
 
   /** Moves the free-look camera in (f < 1) or out (f > 1). */
   zoom(f: number) {
-    if (!this.planet) return;
+    if (!this.planet) {
+      if (this.photoOn) this.photoAim.zoom = Math.max(0.4, Math.min(1.7, this.photoAim.zoom * f));
+      return;
+    }
     this.looking = true;
     this.lookDist = this.clampLook(this.lookDist * f);
+  }
+
+  /** Photo mode: the HUD's helpers (ghost, hint arrow) hide; the camera is the player's to turn and zoom. */
+  get photo() {
+    return this.photoOn;
+  }
+  set photo(on: boolean) {
+    if (on === this.photoOn) return;
+    this.photoOn = on;
+    if (on) {
+      this.photoHid = [this.ghost, this.hintArrow].filter((o): o is THREE.Group => !!o?.visible);
+      for (const o of this.photoHid) o.visible = false;
+      const start = { yaw: this.shownYaw * (Math.PI / 2), pitch: 1.08, zoom: 1.05 };
+      this.photoAim = { ...start };
+      this.photoShown = { ...start };
+    } else {
+      for (const o of this.photoHid) o.visible = true;
+      this.photoHid = [];
+    }
+    if (this.planet) this.looking = on;
+  }
+
+  /**
+   * The picture on screen as a PNG, with the game's name and `caption` in a corner. Drawn
+   * and copied in one go (the canvas keeps no picture between frames).
+   */
+  snapshot(caption: string): Promise<Blob | null> {
+    this.draw(this.now);
+    const src = this.renderer.domElement;
+    const out = document.createElement('canvas');
+    out.width = src.width;
+    out.height = src.height;
+    const ctx = out.getContext('2d');
+    if (!ctx) return Promise.resolve(null);
+    ctx.drawImage(src, 0, 0);
+    const u = Math.max(1, out.height / 720);
+    const pad = 18 * u;
+    ctx.font = `600 ${24 * u}px Fredoka, system-ui, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 6 * u;
+    ctx.fillStyle = '#fff';
+    ctx.fillText('Cratelands', pad, out.height - pad);
+    const w = ctx.measureText('Cratelands ').width;
+    ctx.font = `600 ${16 * u}px Inter, system-ui, sans-serif`;
+    ctx.globalAlpha = 0.85;
+    ctx.fillText(caption, pad + w, out.height - pad - 2 * u);
+    return new Promise((r) => out.toBlob((b) => r(b), 'image/png'));
   }
 
   private clampLook(d: number) {

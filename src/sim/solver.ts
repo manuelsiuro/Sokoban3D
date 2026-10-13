@@ -37,6 +37,37 @@ export function liveCells(g: Grid): Uint8Array {
   return live;
 }
 
+/**
+ * Crates that can never reach a pad any more (classic levels only; [] elsewhere): on a dead
+ * square, or frozen in a 2×2 block of walls and crates that isn't all on pads. Only ever
+ * certain cases, so a warning built on it is never wrong. `live` is liveCells(g), cached by the caller.
+ */
+export function stuckCrates(g: Grid, cells: number[], live: Uint8Array): number[] {
+  if (!g.classic) return [];
+  const crate = new Set(cells.filter((c) => c >= 0));
+  const out = new Set<number>();
+  cells.forEach((c, k) => {
+    if (c >= 0 && !live[c]) out.add(k);
+  });
+  // A 2×2 block (flat islands: the square closes on the grid) where nothing can move.
+  if (!g.planet) {
+    const solid = (c: number) => c >= 0 && (g.wall[c] === 1 || g.floor[c] === VOID || crate.has(c));
+    for (const c of crate) {
+      for (const [dx, dy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) {
+        const x = (c % g.w) + dx;
+        const y = Math.floor(c / g.w) + dy;
+        if (x < 0 || y < 0 || x + 1 >= g.w || y + 1 >= g.h) continue;
+        const block = [y * g.w + x, y * g.w + x + 1, (y + 1) * g.w + x, (y + 1) * g.w + x + 1];
+        if (!block.every(solid)) continue;
+        const held = block.filter((b) => crate.has(b));
+        if (held.every((b) => g.goal[b])) continue;
+        for (const b of held) if (!g.goal[b]) out.add(cells.indexOf(b));
+      }
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 export function solve(g: Grid, opts: { maxStates?: number; maxDepth?: number; start?: Int16Array } = {}): SolveResult {
   const maxStates = opts.maxStates ?? 3_000_000;
   const maxDepth = opts.maxDepth ?? Infinity;

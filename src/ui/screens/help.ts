@@ -158,11 +158,13 @@ const PUSH_PIC = pic({ rows: ['#####', '# $@#', '#   #'], arrows: [[2, 1, 1, 1]]
 // ------------------------------------------------------------------ screen
 const BUTTONS: [string, Key][] = [
   ['undo', 'help.b.undo'],
+  ['crate', 'help.b.stuck'],
   ['replay', 'help.b.restart'],
   ['bulb', 'help.b.hint'],
   ['rotateRight', 'help.b.turn'],
   ['map', 'help.b.map'],
   ['globe', 'help.b.globe'],
+  ['camera', 'help.b.photo'],
   ['hand', 'help.b.hand'],
   ['compass', 'help.b.compass'],
   ['chevronLeft', 'help.b.back'],

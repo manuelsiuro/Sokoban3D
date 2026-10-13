@@ -1,4 +1,5 @@
-import { EVENT, inputOf, neighbour, type GameState } from '../sim/Sim';
+import { EVENT, crateCells, inputOf, neighbour, type GameState } from '../sim/Sim';
+import { liveCells, stuckCrates } from '../sim/solver';
 import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
@@ -8,7 +9,7 @@ import { TILE } from '../sim/grid';
 import { walkTo } from '../game/path';
 import { Coach } from './coach';
 import { levelText, t, type Key } from '../i18n';
-import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
+import { click, photos, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
 import { formatTime } from '../game/score';
 import { isWorldOpen, loadProgress } from '../game/progress';
@@ -42,6 +43,7 @@ const hud = h(
      <span class="sep"></span>
      <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
      <button class="icon-btn" data-a="right" data-l="hud.turnRight">${icon('rotateRight')}</button>
+     <button class="icon-btn hud-photo" data-a="photo" data-l="hud.photo">${icon('camera')}</button>
    </div>
    <button class="hud-minimap gone" data-a="minimap" data-l="hud.minimap"></button>
    <p class="hud-tip gone" role="status" aria-live="polite"></p>
@@ -147,6 +149,9 @@ interface Run {
   /** Expedition compasses left (undefined: no skipping here); `giveUp`: pressed once with none. */
   skip?: number;
   giveUp?: boolean;
+  /** Classic levels: the cells a crate can still be pushed to a pad from (null elsewhere), and the crates last flagged as stuck. */
+  live: Uint8Array | null;
+  stuck: number[];
   done: (result: RunResult | null) => void;
 }
 export interface RunResult {
@@ -184,11 +189,13 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   return new Promise((resolve) => {
     const ghost = settings.ghost && opts.ghost && !opts.autoplay && runSolves(level, opts.ghost) ? ghostPath(level, opts.ghost) : null;
     document.body.classList.add('is-playing');
-    run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip };
+    run = { level, par: levelPar, ghost, watching: !!opts.autoplay, timer: 0, clean: true, over: false, done: resolve, skip: opts.skip, live: screen.sim.grid.classic ? liveCells(screen.sim.grid) : null, stuck: [] };
+    view.setStuck([]);
     $('.hud-skip').classList.toggle('gone', opts.skip === undefined);
     $('.hud-timer').classList.toggle('gone', !opts.timed);
     // The clock doesn't stop for the rules: no help button against it.
     $('.hud-help').classList.toggle('gone', !!opts.timed || !!opts.autoplay);
+    $('.hud-photo').classList.toggle('gone', !!opts.timed);
     if (opts.timed) {
       const tg = opts.timed.ghost;
       const steps = settings.ghost && tg && runSolves(level, tg.moves) ? ghostPath(level, tg.moves) : null;
@@ -294,7 +301,8 @@ function present(prev: GameState, forward: boolean) {
     coach.on('move');
     if (e & EVENT.goalOn) {
       coach.on('goal');
-      sound.goal();
+      const g = screen.sim.grid;
+      sound.goal(s.crates.filter((c) => c.cell >= 0 && g.goal[c.cell] === 1 && c.z === g.floor[c.cell]).length);
       buzz('goal');
     }
     if (e & EVENT.slide) sound.slide();
@@ -313,6 +321,7 @@ function present(prev: GameState, forward: boolean) {
     if (e & EVENT.convey) sound.convey();
     if (e & (EVENT.open | EVENT.close)) sound.door((e & EVENT.open) !== 0);
   } else sound.undo();
+  checkStuck(forward);
   updateHud();
   if (s.moves >= 3 && s.moves < 4 && !tip.classList.contains('coach')) tip.classList.add('gone');
   if (forward && s.events & EVENT.win && run) {
@@ -430,6 +439,13 @@ function act(a: string) {
     showHelp({ open: new Set(WORLDS.filter((_, k) => isWorldOpen(k, p)).map((w) => w.id)), world: run.level.world }, click);
     return;
   }
+  if (a === 'photo') {
+    if (run.timed) return;
+    click();
+    stopWalk();
+    photos();
+    return;
+  }
   if (a === 'minimap') {
     click();
     $('.hud-minimap').classList.toggle('big');
@@ -490,8 +506,25 @@ function act(a: string) {
     screen.sim.restart();
     screen.shown = screen.sim.state;
     view.show(screen.shown, null);
+    checkStuck(false);
     sound.undo();
     updateHud();
+  }
+}
+
+/**
+ * Crates that can never reach a pad any more glow red; the first time one gets stuck, the tip
+ * says so (and how to fix it). Only sure cases (solver.ts), so it never cries wolf.
+ */
+function checkStuck(forward: boolean) {
+  if (!run) return;
+  const stuck = run.live && settings.stuck && !run.watching ? stuckCrates(screen.sim.grid, crateCells(screen.sim.raw), run.live) : [];
+  const fresh = stuck.some((k) => !run!.stuck.includes(k));
+  run.stuck = stuck;
+  view.setStuck(stuck);
+  if (forward && fresh && !run.over) {
+    sound.stuck();
+    say(t('hud.crateStuck'), 6000);
   }
 }
 
@@ -527,7 +560,7 @@ async function askHint() {
 }
 
 const KEYS: Record<string, number> = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };
-const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', KeyV: 'overview', Escape: 'back' };
+const ACTIONS: Record<string, string> = { KeyH: 'hint', KeyZ: 'undo', Backspace: 'undo', KeyY: 'redo', KeyR: 'restart', KeyQ: 'left', KeyE: 'right', KeyV: 'overview', KeyP: 'photo', Escape: 'back' };
 addEventListener('keydown', (e) => {
   // A dialog over the level (help, a card) takes the keys.
   if (run && document.querySelector('.modal')) return;

@@ -168,9 +168,21 @@ export class Sound {
   undo() {
     this.tone(600, 380, 0.07, 'triangle', 0.08);
   }
-  goal() {
-    this.tone(660, 990, 0.18, 'triangle', 0.18);
-    this.tone(990, 1320, 0.22, 'sine', 0.1, 0.06);
+  /** The camera's shutter: a click and a short whirr. */
+  shutter() {
+    this.hiss(4200, 0.04, 0.3, 3, 'bandpass');
+    this.hiss(1800, 0.09, 0.15, 1.5, 'bandpass');
+  }
+  /** A crate that can't be saved any more: a soft falling "uh-oh". */
+  stuck() {
+    this.tone(440, 392, 0.12, 'triangle', 0.1);
+    this.tone(330, 262, 0.2, 'triangle', 0.1, 0.13);
+  }
+  /** A crate onto a pad; `k` crates are on pads now: each one a step up the scale. */
+  goal(k = 1) {
+    const m = 2 ** (([0, 2, 4, 7, 9, 12, 14, 16][Math.max(0, k - 1)] ?? 16) / 12);
+    this.tone(660 * m, 990 * m, 0.18, 'triangle', 0.18);
+    this.tone(990 * m, 1320 * m, 0.22, 'sine', 0.1, 0.06);
   }
   slide() {
     this.hiss(2400, 0.28, 0.12, 0.7, 'highpass');

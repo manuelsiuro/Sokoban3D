@@ -8,7 +8,7 @@ export function showSettings(
   s: Settings,
   hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void; tier?: string },
 ): Promise<void> {
-  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics' | 'symbols', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
+  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics' | 'symbols' | 'stuck', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const body = () => `<div class="card settings-card">
       <div class="card-head"><h2>${t('settings.title')}</h2><button class="icon-btn" data-done aria-label="${t('common.close')}">${icon('close', 18)}</button></div>
@@ -24,6 +24,7 @@ export function showSettings(
       <div class="set-list">
         ${row('ghost', t('settings.ghost'), s.ghost)}
         ${row('symbols', t('settings.symbols'), s.symbols)}
+        ${row('stuck', t('settings.stuck'), s.stuck)}
         ${row('shake', t('settings.shake'), s.shake)}
         ${typeof navigator.vibrate === 'function' ? row('haptics', t('settings.haptics'), s.haptics) : ''}
         ${row('reducedMotion', t('settings.reducedMotion'), s.reducedMotion)}

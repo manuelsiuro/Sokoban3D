@@ -1,0 +1,2 @@
+15 classic levels, 410 solution states, none stuck
+corner, frozen square, frozen on pads: ok

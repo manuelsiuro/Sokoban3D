@@ -39,6 +39,8 @@ export interface Biome {
   ambient: number;
   decor: DecorKind[];
   air: Atmosphere;
+  /** Soft ground (snow, sand): the pusher leaves footprints of this color, fading. */
+  prints?: number;
 }
 
 export const BIOMES: Record<string, Biome> = {
@@ -58,6 +60,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xc98f54, crateTrim: 0x7d4f27, goal: 0x5fe3ff,
     sun: 0xf2f6ff, sunIntensity: 2.2, ambient: 1.4,
     decor: ['pine', 'pine', 'pine', 'snowRock', 'snowRock'],
+    prints: 0x8fa9c6,
     air: { clouds: { top: 0xffffff, belly: 0xbccbe0, count: 8 }, motes: { color: 0xffffff, count: 260, rise: -0.6, size: 0.09, glow: false }, far: 'islands' },
   },
   desert: {
@@ -67,6 +70,7 @@ export const BIOMES: Record<string, Biome> = {
     crate: 0xb77b45, crateTrim: 0x6f4421, goal: 0x3fd0c9,
     sun: 0xffe2b0, sunIntensity: 2.6, ambient: 1.15,
     decor: ['cactus', 'cactus', 'pillar', 'rock', 'grass'],
+    prints: 0xb98a4c,
     air: { clouds: { top: 0xfff8ea, belly: 0xf0c99a, count: 5 }, motes: { color: 0xffe2a8, count: 60, rise: 0.05, size: 0.06, glow: false }, far: 'islands' },
   },
   sky: {

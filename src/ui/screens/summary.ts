@@ -28,6 +28,8 @@ export interface SummaryInfo {
   bound?: boolean;
   /** Time Trial: the time shown first, the medal's name, the next medal's time (stars are the medal). */
   time?: { text: string; medal: string; next: string; gold: boolean };
+  /** Photo mode over the solved island (the card steps aside until it closes). */
+  photo?: () => Promise<void>;
 }
 
 /** A solved level: stars, moves against par, and what to do next. */
@@ -58,6 +60,7 @@ export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number
           ${r.hasNext && !r.noRetry ? `<button class="big-btn ghost" data-c="retry" aria-label="${t('summary.retry')}">${icon('replay', 18)} ${t('summary.retry')}</button>` : ''}
           ${r.watch ? `<button class="big-btn ghost" data-c="watch" aria-label="${t('summary.watchBest')}">${icon('play', 16)} ${t('summary.watch')}</button>` : ''}
           ${r.share ? `<button class="big-btn ghost" data-share>${icon('share', 18)} ${t('summary.share')}</button>` : ''}
+          ${r.photo ? `<button class="big-btn ghost" data-photo aria-label="${t('summary.photo')}" title="${t('summary.photo')}">${icon('camera', 18)}</button>` : ''}
         </div>
       </div>
     </div>`,
@@ -68,6 +71,13 @@ export function showSummary(r: SummaryInfo, click: () => void, star?: (k: number
       if (share && r.share) {
         click();
         share.textContent = await r.share();
+        return;
+      }
+      if ((e.target as HTMLElement).closest('[data-photo]') && r.photo) {
+        click();
+        el.style.display = 'none';
+        await r.photo();
+        el.style.display = '';
         return;
       }
       const c = (e.target as HTMLElement).closest<HTMLElement>('[data-c]')?.dataset.c as SummaryChoice | undefined;

@@ -14,7 +14,8 @@ import { loadDaily } from '../game/dailyProgress';
 import { loadProgress } from '../game/progress';
 import { TOUCH, closeOverlay, h } from '../ui/dom';
 import { icon } from '../ui/icons';
-import { setLang, t } from '../i18n';
+import { levelText, setLang, t } from '../i18n';
+import { photoMode } from '../ui/screens/photo';
 import { showSummary, type SummaryInfo } from '../ui/screens/summary';
 import { buzz, setHaptics } from './haptics';
 
@@ -43,8 +44,11 @@ if (!TOUCH) {
   });
 }
 
-/** The summary after a solve, with its sounds. */
-export const summary = (r: SummaryInfo) => showSummary({ pulls: screen.sim.grid.pull, ...r }, click, (k) => sound.star(k));
+/** Photo mode over the level on screen; resolves when it closes. */
+export const photos = () => photoMode(view, levelText(screen.sim.level).name, `cratelands-${screen.sim.level.id}`, { click, shutter: () => sound.shutter() });
+
+/** The summary after a solve, with its sounds (and a photo of the solved island). */
+export const summary = (r: SummaryInfo) => showSummary({ pulls: screen.sim.grid.pull, photo: photos, ...r }, click, (k) => sound.star(k));
 /** A campaign level's par (its stored solution's length). */
 export const par = (index: number) => SOLUTIONS[LEVELS[index].id]?.length ?? 0;
 
