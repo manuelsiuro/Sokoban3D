@@ -6,6 +6,7 @@ import { EVENT, type GameState } from '../sim/Sim';
 import { rng } from '../sim/rng';
 import { biomeOf, type Biome } from '../world/biomes';
 import { Atmosphere } from './atmosphere';
+import { Particles } from './particles';
 import { bake, plain, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
 import { CRATE_COLORS, Mechanics, dressCrate, tileColor } from './mechanics';
@@ -24,14 +25,6 @@ interface Tween {
   drop: boolean;
 }
 
-interface Particle {
-  m: THREE.Mesh;
-  v: THREE.Vector3;
-  life: number;
-  max: number;
-  spin: number;
-}
-
 const hash = (s: string) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
 /**
@@ -41,6 +34,8 @@ const hash = (s: string) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0
 export class View {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
+  /** Everything of the level (island, crates, pusher, mechanics): it rises, sinks and shakes as one. */
+  private root = new THREE.Group();
   private world = new THREE.Group();
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
@@ -64,7 +59,18 @@ export class View {
   private t0 = 0;
   private dur = MOVE_T;
   private now = 0;
-  private particles: Particle[] = [];
+  private fx = new Particles(this.root);
+  /** The level's entrance (fly-in, island rising) and exit (sinking): start times, or -1. */
+  private introAt = -1;
+  private outroAt = -1;
+  private outroDone: (() => void) | null = null;
+  /** Screen shake: strength, fading out. */
+  private shakeAmp = 0;
+  /** Shake on falls and lava (a setting). */
+  shake = true;
+  /** When the pusher last landed, and each crate's last stop (for squash). */
+  private landAt = -1;
+  private crateStop: number[] = [];
   private air: Atmosphere | null = null;
   /** Decor parts that turn (gears). */
   private spinners: THREE.Object3D[] = [];
@@ -89,7 +95,8 @@ export class View {
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.02;
-    this.scene.add(this.hemi, this.sun, this.sun.target, this.world, this.player.group);
+    this.root.add(this.world, this.player.group);
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.root);
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -113,11 +120,15 @@ export class View {
     this.grid = grid;
     const b = (this.biome = biomeOf(level.world));
     this.world.clear();
-    for (const c of this.crates) this.scene.remove(c.group);
+    for (const c of this.crates) this.root.remove(c.group);
     this.crates = [];
     this.goals = [];
     this.wonAt = -1;
     this.setGhost(null);
+    this.root.position.set(0, 0, 0);
+    this.fx.clear();
+    this.crateStop = [];
+    this.shakeAmp = 0;
     const R = rng(hash(level.id));
     // Sky, fog and light.
     this.scene.background = skyTexture(b.skyTop, b.skyBottom);
@@ -233,9 +244,9 @@ export class View {
         this.goals.push({ cell: c, glow });
       }
     }
-    if (this.mech) this.scene.remove(this.mech.group);
+    if (this.mech) this.root.remove(this.mech.group);
     this.mech = new Mechanics(grid, (c, z, out) => this.pos(c, z, out), LEVEL_H);
-    this.scene.add(this.mech.group);
+    this.root.add(this.mech.group);
     for (const [x, y, z] of island) {
       if (solid(x, y) || R.next() > 0.45) continue;
       const d = decorModel(R.pick(b.decor), b, R.next);
@@ -258,7 +269,7 @@ export class View {
       const c = crateModel(b, grid.crateKind[k] === 0 ? this.look : undefined);
       dressCrate(c.group, c.panels, grid.crateKind[k]);
       c.panels.userData.base = c.panels.color.getHex();
-      this.scene.add(c.group);
+      this.root.add(c.group);
       this.crates.push({ ...c, tween: null, lost: false });
     }
     // Framing: the playable box.
@@ -334,6 +345,7 @@ export class View {
       if (animate && was && was.cell >= 0 && (was.cell !== c.cell || was.z !== c.z)) {
         const from = this.pos(was.cell, was.z).add(new THREE.Vector3(0, CRATE / 2, 0));
         view.tween = { from, to, drop: c.z < was.z };
+        this.crateStop[k] = this.now + this.dur;
       } else {
         view.tween = null;
         view.group.position.copy(to);
@@ -343,6 +355,7 @@ export class View {
     if (teleported && prev && onPad(s.cell) && prev.cell !== s.cell) this.pops.add(-1);
     if (animate && prev && prev.cell !== s.cell) {
       this.playerTween = { from: this.pos(prev.cell, prev.z), to: pTo, drop: false };
+      this.landAt = this.now + this.dur;
       this.hop = s.z > prev.z ? 0.45 : s.z < prev.z ? 0.25 : 0.08;
     } else {
       this.playerTween = null;
@@ -355,6 +368,34 @@ export class View {
     this.pushing = (s.events & EVENT.push) !== 0 && prev !== null && s.moves > prev.moves;
     // Feedback.
     if (animate && prev && s.moves > prev.moves) {
+      this.introAt = -1;
+      const g = this.grid;
+      const at = (cell: number, z: number, y = 0.05) => this.pos(cell, z).add(new THREE.Vector3(0, y, 0));
+      // A puff where the pusher took off; dust behind anything sliding on ice.
+      this.fx.emit(at(prev.cell, prev.z), 0xffffff, 2, 0.5, 'puff', { size: 0.8 });
+      if (s.events & EVENT.slide) {
+        s.crates.forEach((c, k) => {
+          const was = prev.crates[k];
+          if (c.cell >= 0 && was.cell >= 0 && c.cell !== was.cell) this.fx.emit(at(was.cell, was.z), 0xeaf6ff, 5, 0.8, 'puff', { size: 1.1 });
+        });
+        if (s.cell !== prev.cell) this.fx.emit(at(prev.cell, prev.z), 0xeaf6ff, 3, 0.6, 'puff');
+      }
+      if (s.events & EVENT.fill) {
+        // A crate swallowed by lava throws embers and smoke; by a pit, sand.
+        s.crates.forEach((c, k) => {
+          if (c.cell < 0 || c.cell === prev.crates[k].cell || c.z !== g.floor[c.cell]) return;
+          if (g.tile[c.cell] === TILE.lava) {
+            this.fx.emit(at(c.cell, c.z, 0.3), 0xff7a20, 16, 2.2, 'spark', { up: 1.4, life: 0.9 });
+            this.fx.emit(at(c.cell, c.z, 0.4), 0x5a4a4e, 6, 0.8, 'puff', { size: 1.6, up: 1.5, life: 1.2 });
+            this.kick(0.12);
+          } else if (g.tile[c.cell] === TILE.pit) this.fx.emit(at(c.cell, c.z, 0.4), this.biome.ground, 10, 1.4, 'shard');
+        });
+      }
+      if (s.events & (EVENT.fall | EVENT.lost)) this.kick(s.events & EVENT.lost ? 0.22 : 0.14);
+      if (s.events & EVENT.teleport) {
+        this.fx.emit(at(prev.cell, prev.z, 0.4), 0xd2a8ff, 10, 1.2, 'spark', { up: 1.2 });
+        this.fx.emit(at(s.cell, s.z, 0.4), 0xd2a8ff, 10, 1.2, 'spark', { up: 1.2 });
+      }
       if (s.events & EVENT.push) this.burst(pTo.clone().add(new THREE.Vector3(DX[s.facing] * 0.5, 0.05, DY[s.facing] * 0.5)), this.biome.soil, 4, 0.8);
       if (s.events & EVENT.goalOn) {
         const k = s.pushed;
@@ -423,7 +464,7 @@ export class View {
         }
       });
       this.ghost = g;
-      this.scene.add(g);
+      this.root.add(g);
       this.pos(step.cell, step.z, g.position);
     }
     const wasHidden = !this.ghost.visible;
@@ -449,7 +490,7 @@ export class View {
       shaft.position.z = 0.05;
       g.add(head, shaft);
       this.hintArrow = g;
-      this.scene.add(g);
+      this.root.add(g);
     }
     this.hintArrow.visible = dir !== null;
     if (dir !== null) {
@@ -475,22 +516,38 @@ export class View {
 
   private burst(at: THREE.Vector3, color: number, n: number, speed: number) {
     if (this.reducedMotion) return;
-    const geo = new THREE.TetrahedronGeometry(0.06, 0);
-    for (let k = 0; k < n; k++) {
-      const m = new THREE.Mesh(geo, mat(color, { emissive: color, emissiveIntensity: 0.4 }));
-      m.position.copy(at);
-      const a = Math.random() * Math.PI * 2;
-      const v = new THREE.Vector3(Math.cos(a) * speed * (0.3 + Math.random()), speed * (0.6 + Math.random()), Math.sin(a) * speed * (0.3 + Math.random()));
-      this.scene.add(m);
-      this.particles.push({ m, v, life: 0, max: 0.5 + Math.random() * 0.4, spin: Math.random() * 10 });
-    }
+    this.fx.emit(at, color, n, speed, 'shard');
   }
 
   /** Confetti over the island when it's solved. */
   celebrate() {
-    if (!this.grid) return;
+    if (!this.grid || this.reducedMotion) return;
     const colors = [0xffd447, 0xff6f91, 0x5fe3ff, 0x8fd16a, 0xb983ff];
-    for (let k = 0; k < 5; k++) this.burst(new THREE.Vector3((Math.random() - 0.5) * this.grid.w * 0.6, 1.5, (Math.random() - 0.5) * this.grid.h * 0.6), colors[k], 12, 3);
+    for (let k = 0; k < 5; k++) this.fx.emit(new THREE.Vector3((Math.random() - 0.5) * this.grid.w * 0.6, 1.5, (Math.random() - 0.5) * this.grid.h * 0.6), colors[k], 14, 3, 'shard', { size: 1.4 });
+  }
+
+  /** The level comes in: the camera flies down while the island rises from the clouds. */
+  intro() {
+    if (this.reducedMotion) return;
+    this.introAt = this.now;
+    this.outroAt = -1;
+  }
+
+  /** Ends the entrance at once (the player started moving). */
+  skipIntro() {
+    this.introAt = -1;
+  }
+
+  /** The island sinks into the clouds; resolves when it's gone (at once with reduced motion). */
+  leave(): Promise<void> {
+    if (this.reducedMotion || !this.grid) return Promise.resolve();
+    this.introAt = -1;
+    this.outroAt = this.now;
+    return new Promise((r) => (this.outroDone = r));
+  }
+
+  private kick(amount: number) {
+    if (this.shake && !this.reducedMotion) this.shakeAmp = Math.max(this.shakeAmp, amount);
   }
 
   /** Advances the animations to `time` (seconds) and draws. */
@@ -549,6 +606,38 @@ export class View {
         p.body.rotation.y = w < 0.8 ? (w / 0.8) * Math.PI * 2 : 0;
       } else p.body.rotation.y = 0;
     } else p.body.rotation.y = 0;
+    // Squash and stretch: long in the air, flat for a moment on landing.
+    let sy = 1;
+    if (this.playerTween && !this.pops.has(-1)) sy = 1 + 0.12 * Math.sin(Math.PI * t);
+    const land = time - this.landAt;
+    if (!this.playerTween && land >= 0 && land < 0.16) sy = 1 - 0.14 * Math.sin((land / 0.16) * Math.PI);
+    if (this.reducedMotion) sy = 1;
+    p.body.scale.set(1 / Math.sqrt(sy), sy, 1 / Math.sqrt(sy));
+    // Crates squat a little when they stop.
+    this.crates.forEach((c, k) => {
+      if (c.tween || this.reducedMotion) return;
+      const u = time - (this.crateStop[k] ?? -9);
+      const w = u >= 0 && u < 0.18 ? Math.sin((u / 0.18) * Math.PI) : 0;
+      c.group.scale.set(1 + 0.07 * w, 1 - 0.1 * w, 1 + 0.07 * w);
+    });
+    // Coming in and going out: the whole island rises from below, or sinks away.
+    if (this.introAt >= 0) {
+      const e = Math.min(1, (time - this.introAt) / 1.1);
+      const back = 1 + 2.2 * (e - 1) ** 3 + 1.2 * (e - 1) ** 2;
+      this.root.position.y = -7 * (1 - back);
+      if (e >= 1) {
+        this.introAt = -1;
+        this.root.position.y = 0;
+      }
+    } else if (this.outroAt >= 0) {
+      const e = Math.min(1, (time - this.outroAt) / 0.5);
+      this.root.position.y = -9 * e * e;
+      if (e >= 1) {
+        this.outroAt = -1;
+        this.outroDone?.();
+        this.outroDone = null;
+      }
+    } else this.root.position.y = 0;
     // Goals pulse until covered; crates on goals glow.
     if (this.state && this.grid) {
       const onGoal = new Set<number>();
@@ -557,10 +646,13 @@ export class View {
       });
       const covered = new Set(this.state.crates.filter((c, k) => onGoal.has(k) && c).map((c) => c.cell));
       for (const g of this.goals) g.glow.emissiveIntensity = covered.has(g.cell) ? 1.4 : 0.45 + 0.35 * Math.sin(time * 3);
+      // Once solved, the crates flash one after another.
+      const won = this.wonAt >= 0 ? time - this.wonAt : -1;
       this.crates.forEach((c, k) => {
         const on = onGoal.has(k);
         c.panels.emissive.set(on ? this.biome.goal : 0x000000);
-        c.panels.emissiveIntensity = on ? 0.35 : 0;
+        const flash = won >= 0 ? Math.max(0, 1 - Math.abs(won - 0.25 - k * 0.14) / 0.18) : 0;
+        c.panels.emissiveIntensity = on ? 0.35 + flash * 1.1 : 0;
       });
     }
     this.mech?.update(time, dt);
@@ -575,19 +667,7 @@ export class View {
       const bob = 0.55 + Math.sin(time * 6) * 0.08;
       this.hintArrow.position.set(at.x + DX[this.hintDir] * bob, at.y + 0.5, at.z + DY[this.hintDir] * bob);
     }
-    // Particles.
-    for (let k = this.particles.length - 1; k >= 0; k--) {
-      const q = this.particles[k];
-      q.life += dt;
-      q.v.y -= 6 * dt;
-      q.m.position.addScaledVector(q.v, dt);
-      q.m.rotation.x += q.spin * dt;
-      q.m.scale.setScalar(Math.max(0.01, 1 - q.life / q.max));
-      if (q.life >= q.max) {
-        this.scene.remove(q.m);
-        this.particles.splice(k, 1);
-      }
-    }
+    this.fx.update(dt);
     if (!this.reducedMotion) {
       this.air?.update(time, dt);
       for (const s of this.spinners) s.rotateY(s.userData.spin * dt);
@@ -599,14 +679,34 @@ export class View {
   private placeCamera(dt: number) {
     if (this.orbiting) this.yaw += dt * 0.04;
     this.shownYaw += (this.yaw - this.shownYaw) * Math.min(1, dt * (this.orbiting ? 2 : 6));
-    const a = this.shownYaw * (Math.PI / 2);
-    const pitch = 1.08;
+    let a = this.shownYaw * (Math.PI / 2);
+    let pitch = 1.08;
     // Far enough that the island fits both ways: its depth up and down, its width across.
     const tan = Math.tan((this.camera.fov * Math.PI) / 360);
-    const dist = Math.max((this.radius / tan) * 0.92, (this.halfSpan / (tan * this.camera.aspect)) * 1.04) + 1;
+    let dist = Math.max((this.radius / tan) * 0.92, (this.halfSpan / (tan * this.camera.aspect)) * 1.04) + 1;
+    // The fly-in: from high and far, easing down onto the island.
+    if (this.introAt >= 0) {
+      const e = Math.min(1, (this.now - this.introAt) / 1.1);
+      const k = (1 - e) ** 3;
+      dist *= 1 + 0.9 * k;
+      pitch += 0.3 * k;
+      a -= 0.6 * k;
+    }
+    // Solved: a slow swing and a little closer.
+    if (this.wonAt >= 0 && !this.reducedMotion) {
+      const w = Math.min(1, (this.now - this.wonAt) / 1.6);
+      const ease = w * w * (3 - 2 * w);
+      a += 0.32 * ease;
+      dist *= 1 - 0.1 * ease;
+    }
     this.camera.position.set(this.center.x + Math.sin(a) * Math.cos(pitch) * dist, this.center.y + Math.sin(pitch) * dist, this.center.z + Math.cos(a) * Math.cos(pitch) * dist);
     // On tall screens, aim a little toward the camera: the island rises above the touch controls.
     const lift = this.camera.aspect < 1 ? 0.9 : 0;
     this.camera.lookAt(this.center.x + Math.sin(a) * lift, this.center.y - 0.3, this.center.z + Math.cos(a) * lift);
+    if (this.shakeAmp > 0.002) {
+      const s = this.shakeAmp;
+      this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, (Math.random() - 0.5) * s));
+      this.shakeAmp *= Math.exp(-dt * 9);
+    } else this.shakeAmp = 0;
   }
 }

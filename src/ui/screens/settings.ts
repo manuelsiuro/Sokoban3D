@@ -7,7 +7,7 @@ export function showSettings(
   s: Settings,
   hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void },
 ): Promise<void> {
-  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
+  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const el = h(
     'div',
@@ -24,6 +24,7 @@ export function showSettings(
       <h3 class="set-group">${icon('gamepad', 15)} Play</h3>
       <div class="set-list">
         ${row('ghost', 'Ghost of your best run', s.ghost)}
+        ${row('shake', 'Screen shake', s.shake)}
         ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}
       </div>
       ${hooks.install === 'prompt' ? `<button class="big-btn ghost" data-install>${icon('download', 16)} Install the app</button>` : ''}

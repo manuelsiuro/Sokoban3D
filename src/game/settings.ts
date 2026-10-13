@@ -16,6 +16,8 @@ export interface Settings {
   outfit: string;
   /** Show the ghost of the best run while playing. */
   ghost: boolean;
+  /** The camera shakes on falls and lava. */
+  shake: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   skin: 'world',
   outfit: 'red',
   ghost: true,
+  shake: true,
 };
 
 export function loadSettings(): Settings {
