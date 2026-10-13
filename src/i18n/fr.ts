@@ -411,6 +411,7 @@ export const fr: Partial<Strings> = {
   "help.b.hint": "Montre le prochain coup. Fait perdre le badge « sans annuler » pour cette partie.",
   "help.b.turn": "Tourne la caméra d’un quart de tour, pour voir derrière les murs.",
   "help.b.map": "Grandes îles : vois toute l’île, appuie encore pour te suivre.",
+  "help.b.globe": "Planètes : regarde autour (fais glisser pour tourner la planète). La carte dans le coin la montre dépliée ; touche-la pour l’agrandir.",
   "help.b.hand": "Bosquet miroir : active la main pour tirer les caisses.",
   "help.b.compass": "Expédition : passe cette île, pour 1 boussole.",
   "help.b.back": "Quitte le niveau.",

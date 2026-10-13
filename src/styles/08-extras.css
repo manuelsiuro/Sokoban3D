@@ -740,3 +740,11 @@ input:focus-visible + .switch {
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* The Planets picture: the size of the other rule pictures in How to play; bigger on its intro card. */
+.help-row .planet-pic {
+  width: 104px;
+}
+.intro-pic .planet-pic {
+  width: min(220px, 70%);
+}

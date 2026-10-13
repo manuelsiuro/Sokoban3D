@@ -409,6 +409,7 @@ export const en = {
   "help.b.hint": "Shows the next move. It costs the \"no undo\" badge for this solve.",
   "help.b.turn": "Turn the camera a quarter turn, to see behind walls.",
   "help.b.map": "Big islands: see the whole island, press again to follow you.",
+  "help.b.globe": "Planets: look around (drag to turn the planet). The map in the corner shows it unfolded; tap it to enlarge.",
   "help.b.hand": "Mirror Grove: Grab on, to pull crates.",
   "help.b.compass": "Expedition: skip this island, for 1 compass.",
   "help.b.back": "Leave the level.",

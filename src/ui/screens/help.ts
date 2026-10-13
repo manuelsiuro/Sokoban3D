@@ -162,6 +162,7 @@ const BUTTONS: [string, Key][] = [
   ['bulb', 'help.b.hint'],
   ['rotateRight', 'help.b.turn'],
   ['map', 'help.b.map'],
+  ['globe', 'help.b.globe'],
   ['hand', 'help.b.hand'],
   ['compass', 'help.b.compass'],
   ['chevronLeft', 'help.b.back'],

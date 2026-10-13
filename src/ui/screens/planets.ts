@@ -24,7 +24,7 @@ export const PLANET_PIC = (() => {
   const arrow = `<path d="M${s + 10} ${s + 1}V${s - 9}" stroke="#ffd447" stroke-width="2.4" stroke-linecap="round"/><path d="M${s + 6} ${s - 6}l4 -5 4 5" fill="none" stroke="#ffd447" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;
   const pad = `<circle cx="${s + 10}" cy="${s * 0.35}" r="3.2" fill="none" stroke="#ffd447" stroke-width="1.6"/>`;
   const player = `<circle cx="${s + 10}" cy="${s + 15.5}" r="3" fill="#e0433a"/>`;
-  return `<svg class="help-pic" viewBox="0 0 ${4 * s} ${3 * s}" aria-hidden="true">${sq}${folds}${pad}${crate}${arrow}${player}</svg>`;
+  return `<svg class="help-pic planet-pic" viewBox="0 0 ${4 * s} ${3 * s}" aria-hidden="true">${sq}${folds}${pad}${crate}${arrow}${player}</svg>`;
 })();
 
 /**
