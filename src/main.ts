@@ -27,6 +27,8 @@ import { sharedFlow } from './modes/shared';
 import { workshopFlow } from './modes/workshop';
 import { expeditionFlow } from './modes/expedition';
 import { loadExpedition } from './game/expedition';
+import { startKiosk } from './app/kiosk';
+import { setShowcase } from './ui/screens/title';
 
 /**
  * Wiring: storage first (app/boot), the long-lived objects (app/context), then the title
@@ -48,18 +50,22 @@ function frame(now: number) {
 }
 requestAnimationFrame(frame);
 
+/** Title choices that only open a dialog over it: the showcase island stays as it is. */
+const OVER_TITLE = new Set(['help', 'settings', 'trophies', 'install']);
+
 async function titleFlow() {
+  let last = '';
   for (;;) {
     const p = loadProgress();
     const next = nextLevel(p);
-    showLevel(LEVELS[next ?? 0]);
+    if (!OVER_TITLE.has(last)) showLevel(LEVELS[next ?? 0]);
     screen.mode = 'level';
     view.idle = true;
     // Trophies earned by progress made elsewhere (an older version, another flow).
     newTrophies();
     const have = earned();
     const date = today();
-    const choice = await showTitle(
+    const shown = showTitle(
       {
         stars: totalStars(p),
         maxStars: LEVELS.length * 3,
@@ -89,6 +95,11 @@ async function titleFlow() {
       },
       click,
     );
+    // Behind the menu, the islands of every world take turns.
+    const kiosk = startKiosk((level) => setShowcase(WORLDS.find((w) => w.id === level.world)?.name ?? '', levelText(level).name));
+    const choice = await shown;
+    kiosk.stop();
+    last = choice;
     if (choice === 'play') await levelFlow(next ?? 0);
     else if (choice === 'worlds') await worldsFlow(next === null ? 0 : worldIndex(next));
     else if (choice === 'daily') await dailyFlow();

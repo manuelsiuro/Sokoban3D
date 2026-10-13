@@ -3,17 +3,22 @@ import { t } from '../../i18n';
 import { icon } from '../icons';
 import { installKind, onInstallChange } from '../../app/install';
 
-/** The logo mark: the crate from the app icon, on its glowing pad. */
-const LOGO = `<svg class="logo-crate" viewBox="0 0 160 150" aria-hidden="true">
-  <ellipse class="logo-pad" cx="80" cy="128" rx="58" ry="17"/>
-  <g stroke="#7a4c22" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M24 46 L80 18 L136 46 L80 74 Z" fill="#f0bd76"/>
-    <path d="M24 46 L80 74 L80 136 L24 108 Z" fill="#d89c55"/>
-    <path d="M80 74 L136 46 L136 108 L80 136 Z" fill="#b97a3c"/>
-    <path d="M33 60 L71 122 M127 60 L89 122 M44 41 L100 68" fill="none" opacity="0.85"/>
-  </g>
-  <path d="M30 47 L80 22" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
-</svg>`;
+/**
+ * The logo mark: a crate (framed panels, planks, a brace, nails) sitting on its glowing pad,
+ * drawn in true isometric (built by a short script: faces, then inset panels, then edges).
+ */
+const LOGO = `<svg class="logo-crate" viewBox="0 0 160 152" aria-hidden="true"><defs><linearGradient id="lgTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd896"/><stop offset="1" stop-color="#f1b96c"/></linearGradient><linearGradient id="lgLeft" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2a258"/><stop offset="1" stop-color="#c88540"/></linearGradient><linearGradient id="lgRight" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9783a"/><stop offset="1" stop-color="#94592a"/></linearGradient><radialGradient id="lgGlow"><stop offset="0" stop-color="#ffe27a" stop-opacity="0.75"/><stop offset="0.6" stop-color="#ffd447" stop-opacity="0.3"/><stop offset="1" stop-color="#ffd447" stop-opacity="0"/></radialGradient></defs><ellipse class="lg-glow" cx="80" cy="106" rx="78" ry="40"/><ellipse class="lg-ring" cx="80" cy="106" rx="63" ry="31"/><path class="lg-ticks" d="M68.9 73.3 L80.0 67.5 L91.1 73.3 M142.9 100.2 L154.0 106.0 L142.9 111.8 M91.1 138.7 L80.0 144.5 L68.9 138.7 M17.1 111.8 L6.0 106.0 L17.1 100.2"/><ellipse cx="80" cy="104" rx="58" ry="28" fill="#2a1a08" opacity="0.22"/><path d="M28.0 44.0 L80.0 72.0 L80.0 128.0 L28.0 100.0Z" fill="url(#lgLeft)"/><path d="M36.8 58.3 L71.2 76.8 L71.2 113.7 L36.8 95.2Z" fill="#c9873f"/><path class="lg-plank" d="M36.8 70.6 L71.2 89.1 M36.8 82.9 L71.2 101.4"/><path class="lg-brace" d="M38.4 94.4 L69.6 77.6"/><circle cx="32.4" cy="51.1" r="1.9" class="lg-nail"/><circle cx="75.6" cy="74.4" r="1.9" class="lg-nail"/><circle cx="75.6" cy="120.9" r="1.9" class="lg-nail"/><circle cx="32.4" cy="97.6" r="1.9" class="lg-nail"/><path d="M80.0 72.0 L132.0 44.0 L132.0 100.0 L80.0 128.0Z" fill="url(#lgRight)"/><path d="M88.8 76.8 L123.2 58.3 L123.2 95.2 L88.8 113.7Z" fill="#a76a2f"/><path class="lg-plank" d="M88.8 89.1 L123.2 70.6 M88.8 101.4 L123.2 82.9"/><path class="lg-brace" d="M90.4 111.2 L121.6 60.8"/><circle cx="84.4" cy="74.4" r="1.9" class="lg-nail"/><circle cx="127.6" cy="51.1" r="1.9" class="lg-nail"/><circle cx="127.6" cy="97.6" r="1.9" class="lg-nail"/><circle cx="84.4" cy="120.9" r="1.9" class="lg-nail"/><path d="M28.0 44.0 L80.0 16.0 L132.0 44.0 L80.0 72.0Z" fill="url(#lgTop)"/><path d="M45.7 44.0 L80.0 25.5 L114.3 44.0 L80.0 62.5Z" fill="#e7ad62"/><path class="lg-plank" d="M57.1 37.8 L91.4 56.3 M68.6 31.7 L102.9 50.2"/><circle cx="36.8" cy="44.0" r="1.9" class="lg-nail"/><circle cx="80.0" cy="20.8" r="1.9" class="lg-nail"/><circle cx="123.2" cy="44.0" r="1.9" class="lg-nail"/><circle cx="80.0" cy="67.2" r="1.9" class="lg-nail"/><path class="lg-edge" d="M80.0 16.0 L132.0 44.0 L132.0 100.0 L80.0 128.0 L28.0 100.0 L28.0 44.0Z M28.0 44.0 L80.0 72.0 L132.0 44.0 M80.0 72.0 L80.0 128.0"/><path d="M31.1 42.3 L76.9 17.7" stroke="#fff3d6" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/></svg>`;
+
+/** The showcase caption under the menu: which world's island is behind it. */
+export function setShowcase(world: string, level: string) {
+  const el = document.querySelector<HTMLElement>('.title-showcase');
+  if (!el) return;
+  el.innerHTML = `<b>${world}</b><span>${level}</span>`;
+  // Fade in again with each new island.
+  el.classList.remove('in');
+  void el.offsetWidth;
+  el.classList.add('in');
+}
 
 export type TitleChoice = 'play' | 'worlds' | 'daily' | 'expedition' | 'workshop' | 'trophies' | 'settings' | 'install' | 'help';
 
@@ -55,7 +60,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
     'div',
     'title-screen',
     `<div class="title-inner">
-      <div class="logo"><div class="logo-mark">${LOGO}</div><h1>Cratelands</h1><p class="tagline">${t('title.tagline')}</p></div>
+      <div class="logo"><div class="logo-mark">${LOGO}</div><h1 class="wordmark">Cratelands</h1><p class="tagline">${t('title.tagline')}</p></div>
       <div class="title-panel">
       <div class="title-actions">
         <button class="hero-card play-card" data-c="play" style="--done:${done}%">
@@ -95,6 +100,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
       </div>
       <p class="keys-hint">${t('title.keys')}</p>
     </div>
+    <p class="title-showcase" aria-hidden="true"></p>
     <span class="title-version">v${__APP_VERSION__}</span>
     <button class="icon-btn title-settings" data-c="settings" aria-label="${t('title.settings')}">${icon('gear', 20)}</button>`,
   );

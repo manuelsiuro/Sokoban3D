@@ -12,6 +12,7 @@ export function showSettings(
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const body = () => `<div class="card settings-card">
       <div class="card-head"><h2>${t('settings.title')}</h2><button class="icon-btn" data-done aria-label="${t('common.close')}">${icon('close', 18)}</button></div>
+      <div class="set-body">
       <h3 class="set-group">${icon('sound', 15)} ${t('settings.sound')}</h3>
       <div class="set-list">
         ${row('muted', t('settings.sfx'), !s.muted)}
@@ -35,6 +36,7 @@ export function showSettings(
       ${hooks.install === 'prompt' ? `<button class="big-btn ghost" data-install>${icon('download', 16)} ${t('settings.install')}</button>` : ''}
       ${hooks.install === 'ios' ? `<button class="big-btn ghost" data-install-help>${icon('download', 16)} ${t('settings.install')}</button>` : ''}
       <button class="big-btn ghost danger" data-reset>${icon('replay', 16)} ${t('settings.reset')}</button>
+      </div>
       <div class="actions"><button class="big-btn primary" data-done>${t('settings.done')}</button></div>
     </div>`;
   const el = h('div', 'modal', body());
@@ -50,7 +52,11 @@ export function showSettings(
       else (s as unknown as Record<string, number>)[k] = Number(input.value);
       hooks.change(s);
       // A new language: draw the card again in it.
-      if (k === 'lang') el.innerHTML = body();
+      if (k === 'lang') {
+        const top = el.querySelector('.set-body')?.scrollTop ?? 0;
+        el.innerHTML = body();
+        el.querySelector('.set-body')!.scrollTop = top;
+      }
     });
     let armed = false;
     el.onclick = (e) => {

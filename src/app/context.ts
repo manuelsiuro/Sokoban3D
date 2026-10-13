@@ -64,8 +64,9 @@ map.resize();
 export const screen = { mode: 'level' as 'level' | 'map', sim: new Sim(LEVELS[0]), shown: null as unknown as GameState };
 screen.shown = screen.sim.state;
 
-export function showLevel(level: LevelDef) {
-  sound.setMusic(settings.music, settings.musicVolume, level.world);
+/** Shows a level (and plays its world's music, unless `music: false`: the title's showcase). */
+export function showLevel(level: LevelDef, opts: { music?: boolean } = {}) {
+  if (opts.music !== false) sound.setMusic(settings.music, settings.musicVolume, level.world);
   screen.sim = new Sim(level);
   screen.shown = screen.sim.state;
   view.setLevel(level, screen.sim.grid, screen.shown);

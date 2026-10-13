@@ -9,6 +9,7 @@ import { initialState } from '../sim/Sim';
 import { newDraft, showEditor, type Draft } from '../ui/screens/editor';
 import { play } from './run';
 import { t } from '../i18n';
+import { buzz } from '../app/haptics';
 
 /** The workshop: edit, test-play, come back to the same draft. */
 export async function workshopFlow() {
@@ -27,6 +28,7 @@ export async function workshopFlow() {
       },
       share: async (level, levelPar) => shareText(t('workshop.share', { name: level.name, par: levelPar ? t('workshop.sharePar', { par: levelPar }) : '' }), shareLink(level, levelPar)),
       click,
+      tick: () => buzz('push'),
     });
     if (choice.type === 'back') return;
     const r = await play(choice.level, t('workshop.label'), choice.par);
