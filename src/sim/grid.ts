@@ -55,6 +55,8 @@ export interface Grid {
   gates: boolean;
   /** Every floor is at the same height and nothing but walls and goals is in the way. */
   classic: boolean;
+  /** Pull rules: moves 4–7 step away dragging the crate behind; crates are never pushed. */
+  pull: boolean;
 }
 
 export const DX = [0, 1, 0, -1];
@@ -207,6 +209,7 @@ export function parseLevel(level: LevelDef): Grid {
     emitters: list(TILE.emitter),
     conveyors: list(TILE.conveyor),
     gates: list(TILE.gateEven).length + list(TILE.gateOdd).length > 0,
-    classic: !special && heights.size === 1 && !level.map.some((r) => r.includes(',')),
+    classic: !special && heights.size === 1 && !level.map.some((r) => r.includes(',')) && level.rules !== 'pull',
+    pull: level.rules === 'pull',
   };
 }

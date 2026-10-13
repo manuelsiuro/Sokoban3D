@@ -36,4 +36,6 @@ export interface LevelDef {
   heights?: string[];
   tiles?: string[];
   kinds?: string[];
+  /** 'pull': crates can't be pushed, only pulled (stepping away from one drags it along). */
+  rules?: 'pull';
 }

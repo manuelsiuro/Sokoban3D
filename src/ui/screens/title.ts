@@ -1,4 +1,5 @@
 import { h } from '../dom';
+import { t } from '../../i18n';
 import { icon } from '../icons';
 import { installKind, onInstallChange } from '../../app/install';
 
@@ -40,45 +41,45 @@ export interface TitleInfo {
  */
 export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoice> {
   const done = ((info.stars / Math.max(1, info.maxStars)) * 100).toFixed(1);
-  const sub = info.next ? `${info.fresh ? 'Start with' : 'Next'}: ${info.next.number}. ${info.next.name}` : 'Every level solved · go for 3 stars';
-  const sound = (muted: boolean) => `${icon(muted ? 'mute' : 'sound', 16)}<span>${muted ? 'Sound off' : 'Sound on'}</span>`;
+  const sub = info.next ? t('title.nextLine', { label: t(info.fresh ? 'title.startWith' : 'title.next'), n: info.next.number, name: info.next.name }) : t('title.allSolved');
+  const sound = (muted: boolean) => `${icon(muted ? 'mute' : 'sound', 16)}<span>${t(muted ? 'title.soundOff' : 'title.soundOn')}</span>`;
   const el = h(
     'div',
     'title-screen',
     `<div class="title-inner">
-      <div class="logo"><div class="logo-mark">${LOGO}</div><h1>Cratelands</h1><p class="tagline">Push, slide, climb.</p></div>
+      <div class="logo"><div class="logo-mark">${LOGO}</div><h1>Cratelands</h1><p class="tagline">${t('title.tagline')}</p></div>
       <div class="title-panel">
       <div class="title-actions">
         <button class="hero-card play-card" data-c="play" style="--done:${done}%">
           <span class="hero-ic">${icon('play', 22)}</span>
-          <span class="hero-text"><b>${info.next && !info.fresh ? 'Continue' : 'Play'}</b><small>${sub}</small></span>
+          <span class="hero-text"><b>${t(info.next && !info.fresh ? 'title.continue' : 'title.play')}</b><small>${sub}</small></span>
           <span class="pill">${icon('star', 14)} ${info.stars}/${info.maxStars}</span>
         </button>
         <button class="menu-btn" data-c="worlds" style="--tone:#4fae4a;--tone-2:#2f8a3a;--done:${done}%">
           <span class="menu-ic">${icon('map', 18)}</span>
-          <span class="menu-text"><span class="menu-label">Worlds</span><small>${info.worldsOpen}/${info.worlds} open · ${info.solved}/${info.levels} solved</small></span>
+          <span class="menu-text"><span class="menu-label">${t('title.worlds')}</span><small>${t('title.worldsSub', { open: info.worldsOpen, worlds: info.worlds, solved: info.solved, levels: info.levels })}</small></span>
           ${icon('chevronRight', 16)}<i class="menu-bar"></i>
         </button>
         <button class="menu-btn" data-c="daily" style="--tone:#ff9a3d;--tone-2:#e0662a;--done:${info.daily.stars ? 100 : 0}%">
           <span class="menu-ic">${icon('star', 18)}</span>
-          <span class="menu-text"><span class="menu-label">Daily puzzle</span><small>${info.daily.stars ? `Solved today · ${'★'.repeat(info.daily.stars)}` : 'A new puzzle every day'}${info.daily.streak ? ` · ${info.daily.streak}-day streak` : ''}</small></span>
+          <span class="menu-text"><span class="menu-label">${t('title.daily')}</span><small>${info.daily.stars ? t('title.dailySolved', { stars: '★'.repeat(info.daily.stars) }) : t('title.dailyNew')}${info.daily.streak ? t('title.streak', { n: info.daily.streak }) : ''}</small></span>
           ${icon('chevronRight', 16)}<i class="menu-bar"></i>
         </button>
         <div class="menu-pair">
           <button class="menu-btn" data-c="workshop" style="--tone:#7466f0;--tone-2:#4f3fd1;--done:0%">
             <span class="menu-ic">${icon('hammer', 18)}</span>
-            <span class="menu-text"><span class="menu-label">Workshop</span><small>Build and share</small></span>
+            <span class="menu-text"><span class="menu-label">${t('title.workshop')}</span><small>${t('title.workshopSub')}</small></span>
           </button>
           <button class="menu-btn" data-c="trophies" style="--tone:#f2a51f;--tone-2:#c77d0a;--done:${((info.trophies.have / info.trophies.total) * 100).toFixed(1)}%">
             <span class="menu-ic">${icon('trophy', 18)}</span>
-            <span class="menu-text"><span class="menu-label">Trophies</span><small>${info.trophies.have}/${info.trophies.total}</small></span>
+            <span class="menu-text"><span class="menu-label">${t('title.trophies')}</span><small>${info.trophies.have}/${info.trophies.total}</small></span>
             <i class="menu-bar"></i>
           </button>
         </div>
       </div>
-      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="Settings">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>Install app</span></button></div>
+      <div class="title-foot"><button class="sound-toggle ${info.muted ? 'off' : ''}" data-sound>${sound(info.muted)}</button><button class="icon-btn small" data-c="settings" aria-label="${t('title.settings')}">${icon('gear', 18)}</button><button class="install-btn hidden" data-c="install">${icon('download', 16)}<span>${t('title.install')}</span></button></div>
       </div>
-      <p class="keys-hint"><kbd>WASD</kbd> or arrows to move · <kbd>Z</kbd> undo · <kbd>Q</kbd><kbd>E</kbd> turn</p>
+      <p class="keys-hint">${t('title.keys')}</p>
     </div>
     <span class="title-version">v${__APP_VERSION__}</span>`,
   );
@@ -89,8 +90,8 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
   const stopWatching = onInstallChange(showInstall);
   return new Promise((resolve) => {
     el.onclick = (e) => {
-      const t = e.target as HTMLElement;
-      const toggle = t.closest<HTMLElement>('[data-sound]');
+      const target = e.target as HTMLElement;
+      const toggle = target.closest<HTMLElement>('[data-sound]');
       if (toggle) {
         const muted = info.toggleSound();
         toggle.classList.toggle('off', muted);
@@ -98,7 +99,7 @@ export function showTitle(info: TitleInfo, click: () => void): Promise<TitleChoi
         if (!muted) click();
         return;
       }
-      const c = t.closest<HTMLElement>('[data-c]')?.dataset.c as TitleChoice | undefined;
+      const c = target.closest<HTMLElement>('[data-c]')?.dataset.c as TitleChoice | undefined;
       if (!c) return;
       click();
       stopWatching();

@@ -4,6 +4,7 @@ import { WORLDS } from '../levels/worlds';
 import type { DailyProgress } from './dailyProgress';
 import type { Progress } from './progress';
 import { KEYS, readJSON, writeJSON } from './storage';
+import { t } from '../i18n';
 
 /**
  * Achievements, worked out from progress (so they can't drift from it), and the cosmetics
@@ -24,24 +25,24 @@ export interface Outfit {
 }
 
 export const SKINS: Skin[] = [
-  { id: 'world', name: 'World wood', crate: -1, trim: -1 },
-  { id: 'frost', name: 'Frost', crate: 0xbfe6ff, trim: 0x5f8fb8 },
-  { id: 'iron', name: 'Ironclad', crate: 0x9aa3ad, trim: 0x4d545c },
-  { id: 'gem', name: 'Gemstone', crate: 0xb48cff, trim: 0x5a3fa0 },
-  { id: 'candy', name: 'Candy', crate: 0xff9ec7, trim: 0xffffff },
-  { id: 'gold', name: 'Gold', crate: 0xffcf4d, trim: 0xb07a12 },
-  { id: 'royal', name: 'Royal', crate: 0x3f4fd0, trim: 0xffcf4d },
+  { id: 'world', get name() { return t('skin.world'); }, crate: -1, trim: -1 },
+  { id: 'frost', get name() { return t('skin.frost'); }, crate: 0xbfe6ff, trim: 0x5f8fb8 },
+  { id: 'iron', get name() { return t('skin.iron'); }, crate: 0x9aa3ad, trim: 0x4d545c },
+  { id: 'gem', get name() { return t('skin.gem'); }, crate: 0xb48cff, trim: 0x5a3fa0 },
+  { id: 'candy', get name() { return t('skin.candy'); }, crate: 0xff9ec7, trim: 0xffffff },
+  { id: 'gold', get name() { return t('skin.gold'); }, crate: 0xffcf4d, trim: 0xb07a12 },
+  { id: 'royal', get name() { return t('skin.royal'); }, crate: 0x3f4fd0, trim: 0xffcf4d },
 ];
 
 export const OUTFITS: Outfit[] = [
-  { id: 'red', name: 'Red cap', cap: 0xe0433a, suit: 0x2f6fd0 },
-  { id: 'meadow', name: 'Gardener', cap: 0x4fae4a, suit: 0x8a5a35 },
-  { id: 'explorer', name: 'Explorer', cap: 0xd9b27a, suit: 0x6f8a4a },
-  { id: 'aviator', name: 'Aviator', cap: 0x8a5a35, suit: 0xb9a3d9 },
-  { id: 'brass', name: 'Clockmaker', cap: 0xb8893a, suit: 0x3b2f4a },
-  { id: 'blue', name: 'Sharpshooter', cap: 0x2f8fe0, suit: 0x1f3f6a },
-  { id: 'purple', name: 'Steady', cap: 0x8d5fd6, suit: 0x3a2a5a },
-  { id: 'hardhat', name: 'Architect', cap: 0xffc23d, suit: 0xe8763a },
+  { id: 'red', get name() { return t('outfit.red'); }, cap: 0xe0433a, suit: 0x2f6fd0 },
+  { id: 'meadow', get name() { return t('outfit.meadow'); }, cap: 0x4fae4a, suit: 0x8a5a35 },
+  { id: 'explorer', get name() { return t('outfit.explorer'); }, cap: 0xd9b27a, suit: 0x6f8a4a },
+  { id: 'aviator', get name() { return t('outfit.aviator'); }, cap: 0x8a5a35, suit: 0xb9a3d9 },
+  { id: 'brass', get name() { return t('outfit.brass'); }, cap: 0xb8893a, suit: 0x3b2f4a },
+  { id: 'blue', get name() { return t('outfit.blue'); }, cap: 0x2f8fe0, suit: 0x1f3f6a },
+  { id: 'purple', get name() { return t('outfit.purple'); }, cap: 0x8d5fd6, suit: 0x3a2a5a },
+  { id: 'hardhat', get name() { return t('outfit.hardhat'); }, cap: 0xffc23d, suit: 0xe8763a },
 ];
 
 export interface Ctx {
@@ -74,17 +75,17 @@ const REWARD: Record<string, Achievement['reward']> = {
 };
 
 export const ACHIEVEMENTS: Achievement[] = [
-  { id: 'first', name: 'First Push', desc: 'Solve a level.', count: (c) => Math.min(1, solved(c, ids())), goal: 1 },
+  { id: 'first', get name() { return t('trophy.first.name'); }, get desc() { return t('trophy.first.desc'); }, count: (c) => Math.min(1, solved(c, ids())), goal: 1 },
   ...WORLDS.filter((w) => ids(w.id).length > 0).map(
-    (w): Achievement => ({ id: `world-${w.id}`, name: `${w.name} cleared`, desc: `Solve every level in ${w.name}.`, reward: REWARD[w.id], count: (c) => solved(c, ids(w.id)), goal: ids(w.id).length }),
+    (w): Achievement => ({ id: `world-${w.id}`, get name() { return t('trophy.world.name', { world: w.name }); }, get desc() { return t('trophy.world.desc', { world: w.name }); }, reward: REWARD[w.id], count: (c) => solved(c, ids(w.id)), goal: ids(w.id).length }),
   ),
-  { id: 'par', name: 'Sharp', desc: 'Match the par on 10 levels.', reward: { outfit: 'blue' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.moves ?? 0) > 0 && c.progress[l.id].moves <= (SOLUTIONS[l.id]?.length ?? 0)).length, goal: 10 },
-  { id: 'clean', name: 'Steady Hands', desc: 'Solve 10 levels without undo or restart.', reward: { outfit: 'purple' }, count: (c) => LEVELS.filter((l) => c.progress[l.id]?.clean).length, goal: 10 },
-  { id: 'daily', name: 'Daily Visitor', desc: 'Solve a daily puzzle.', count: (c) => Math.min(1, Object.keys(c.daily.results).length), goal: 1 },
-  { id: 'streak', name: 'Week of Puzzles', desc: 'Solve the daily puzzle 7 days in a row.', reward: { skin: 'candy' }, count: (c) => c.daily.best, goal: 7 },
-  { id: 'architect', name: 'Architect', desc: 'Build a level in the workshop and solve it.', reward: { outfit: 'hardhat' }, count: (c) => (c.built ? 1 : 0), goal: 1 },
-  { id: 'champion', name: 'Cratelands Champion', desc: 'Solve every level.', reward: { skin: 'royal' }, count: (c) => solved(c, ids()), goal: ids().length },
-  { id: 'perfect', name: 'Perfectionist', desc: 'Three stars on every level.', reward: { skin: 'gold' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.stars ?? 0) >= 3).length, goal: ids().length },
+  { id: 'par', get name() { return t('trophy.par.name'); }, get desc() { return t('trophy.par.desc'); }, reward: { outfit: 'blue' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.moves ?? 0) > 0 && c.progress[l.id].moves <= (SOLUTIONS[l.id]?.length ?? 0)).length, goal: 10 },
+  { id: 'clean', get name() { return t('trophy.clean.name'); }, get desc() { return t('trophy.clean.desc'); }, reward: { outfit: 'purple' }, count: (c) => LEVELS.filter((l) => c.progress[l.id]?.clean).length, goal: 10 },
+  { id: 'daily', get name() { return t('trophy.daily.name'); }, get desc() { return t('trophy.daily.desc'); }, count: (c) => Math.min(1, Object.keys(c.daily.results).length), goal: 1 },
+  { id: 'streak', get name() { return t('trophy.streak.name'); }, get desc() { return t('trophy.streak.desc'); }, reward: { skin: 'candy' }, count: (c) => c.daily.best, goal: 7 },
+  { id: 'architect', get name() { return t('trophy.architect.name'); }, get desc() { return t('trophy.architect.desc'); }, reward: { outfit: 'hardhat' }, count: (c) => (c.built ? 1 : 0), goal: 1 },
+  { id: 'champion', get name() { return t('trophy.champion.name'); }, get desc() { return t('trophy.champion.desc'); }, reward: { skin: 'royal' }, count: (c) => solved(c, ids()), goal: ids().length },
+  { id: 'perfect', get name() { return t('trophy.perfect.name'); }, get desc() { return t('trophy.perfect.desc'); }, reward: { skin: 'gold' }, count: (c) => LEVELS.filter((l) => (c.progress[l.id]?.stars ?? 0) >= 3).length, goal: ids().length },
 ];
 
 interface Stored {

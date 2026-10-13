@@ -2,6 +2,7 @@ import type { LevelDef } from '../../levels/types';
 import { parseLevel } from '../../sim/grid';
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
+import { t as tr, type Key } from '../../i18n';
 
 /**
  * The workshop: paint a level on a grid (terrain, things, mechanics, colors, heights), check
@@ -41,7 +42,7 @@ export function newDraft(w = 7, h = 6): Draft {
     const y = Math.floor(i / w);
     return x === 0 || y === 0 || x === w - 1 || y === h - 1 ? '#' : '-';
   });
-  const d: Draft = { name: 'My level', w, h, base, thing: Array(n).fill(''), goal: Array(n).fill(false), tile: Array(n).fill(' '), kind: Array(n).fill(' '), height: Array(n).fill(0), par: 0 };
+  const d: Draft = { name: tr('editor.myLevel'), w, h, base, thing: Array(n).fill(''), goal: Array(n).fill(false), tile: Array(n).fill(' '), kind: Array(n).fill(' '), height: Array(n).fill(0), par: 0 };
   const at = (x: number, y: number) => y * w + x;
   d.thing[at(1, 1)] = '@';
   d.thing[at(3, 2)] = '$';
@@ -54,10 +55,10 @@ export function draftLevel(d: Draft): LevelDef {
   const rows = (f: (i: number) => string) => [...Array(d.h)].map((_, y) => [...Array(d.w)].map((_, x) => f(y * d.w + x)).join(''));
   return {
     id: 'workshop',
-    name: d.name.trim() || 'My level',
+    name: d.name.trim() || tr('editor.myLevel'),
     world: 'meadow',
     difficulty: 3,
-    tip: 'Your own level. Undo is free.',
+    tip: tr('editor.tip'),
     map: rows((i) => {
       if (d.base[i] === '#') return '#';
       if (d.base[i] === ',') return ',';
@@ -153,6 +154,8 @@ const GROUPS: { name: string; tools: Tool[] }[] = [
   },
 ];
 const TOOLS = GROUPS.flatMap((g) => g.tools);
+/** A tool's name in the current language. */
+const toolLabel = (tool: Tool) => tr(`editor.tool.${tool.id}` as Key);
 const KIND_COLOR: Record<string, string> = { r: '#e0533d', g: '#4fb84a', b: '#3f7fe0', y: '#f2c230' };
 
 /** Resizes a draft, keeping what fits. */
@@ -183,27 +186,27 @@ export function showEditor(start: Draft, hooks: EditorHooks): Promise<EditorChoi
     'screen editor',
     `<div class="screen-inner">
       <div class="screen-head">
-        <button class="icon-btn" data-back aria-label="Back">${icon('chevronLeft')}</button>
-        <h2>Workshop</h2>
+        <button class="icon-btn" data-back aria-label="${tr('common.back')}">${icon('chevronLeft')}</button>
+        <h2>${tr('editor.title')}</h2>
       </div>
       <div class="ed-row">
-        <input class="ed-name" maxlength="32" aria-label="Level name">
+        <input class="ed-name" maxlength="32" aria-label="${tr('editor.name')}">
         <span class="ed-size">
-          <button class="icon-btn small" data-size="w-1" aria-label="Narrower">−</button><b class="ed-w"></b>
-          <button class="icon-btn small" data-size="w1" aria-label="Wider">+</button>
+          <button class="icon-btn small" data-size="w-1" aria-label="${tr('editor.narrower')}">−</button><b class="ed-w"></b>
+          <button class="icon-btn small" data-size="w1" aria-label="${tr('editor.wider')}">+</button>
           <span>×</span>
-          <button class="icon-btn small" data-size="h-1" aria-label="Shorter">−</button><b class="ed-h"></b>
-          <button class="icon-btn small" data-size="h1" aria-label="Taller">+</button>
+          <button class="icon-btn small" data-size="h-1" aria-label="${tr('editor.shorter')}">−</button><b class="ed-h"></b>
+          <button class="icon-btn small" data-size="h1" aria-label="${tr('editor.taller')}">+</button>
         </span>
       </div>
-      <div class="ed-tools">${GROUPS.map((g) => `<div class="ed-group"><small>${g.name}</small><div>${g.tools.map((t) => `<button class="ed-tool" data-tool="${t.id}" title="${t.label}" style="${t.id.startsWith('k') && KIND_COLOR[t.id[1]] ? `color:${KIND_COLOR[t.id[1]]}` : ''}"><i>${t.glyph}</i><span>${t.label}</span></button>`).join('')}</div></div>`).join('')}</div>
+      <div class="ed-tools">${GROUPS.map((g) => `<div class="ed-group"><small>${tr(`editor.group.${g.name}` as Key)}</small><div>${g.tools.map((t) => `<button class="ed-tool" data-tool="${t.id}" title="${toolLabel(t)}" style="${t.id.startsWith('k') && KIND_COLOR[t.id[1]] ? `color:${KIND_COLOR[t.id[1]]}` : ''}"><i>${t.glyph}</i><span>${toolLabel(t)}</span></button>`).join('')}</div></div>`).join('')}</div>
       <div class="ed-grid-wrap"><div class="ed-grid"></div></div>
       <p class="ed-status"></p>
       <div class="actions ed-actions">
-        <button class="big-btn ghost" data-act="clear">${icon('close', 16)} New</button>
-        <button class="big-btn ghost" data-act="check">${icon('bulb', 16)} Check</button>
-        <button class="big-btn ghost" data-act="share">${icon('share', 16)} Share</button>
-        <button class="big-btn primary" data-act="play">${icon('play', 16)} Play</button>
+        <button class="big-btn ghost" data-act="clear">${icon('close', 16)} ${tr('editor.new')}</button>
+        <button class="big-btn ghost" data-act="check">${icon('bulb', 16)} ${tr('editor.check')}</button>
+        <button class="big-btn ghost" data-act="share">${icon('share', 16)} ${tr('editor.share')}</button>
+        <button class="big-btn primary" data-act="play">${icon('play', 16)} ${tr('editor.play')}</button>
       </div>
     </div>`,
   );
@@ -214,7 +217,7 @@ export function showEditor(start: Draft, hooks: EditorHooks): Promise<EditorChoi
   const problem = () => {
     try {
       const g = parseLevel(draftLevel(d));
-      if (g.goals.length + g.receivers.length === 0) return 'Add a pad (or a laser crystal) to solve.';
+      if (g.goals.length + g.receivers.length === 0) return tr('editor.noGoal');
       return '';
     } catch (e) {
       return String((e as Error).message).replace(/^workshop: /, '');
@@ -239,7 +242,7 @@ export function showEditor(start: Draft, hooks: EditorHooks): Promise<EditorChoi
     for (const b of el.querySelectorAll<HTMLElement>('[data-tool]')) b.classList.toggle('on', b.dataset.tool === tool.id);
     const p = problem();
     if (p) say(p, true);
-    else say(d.par > 0 ? `Solvable · par ${d.par}` : 'Not checked yet: Check runs the solver.');
+    else say(d.par > 0 ? tr('editor.solvable', { par: d.par }) : tr('editor.unchecked'));
   };
   const changed = () => {
     d.par = 0;
@@ -289,13 +292,13 @@ export function showEditor(start: Draft, hooks: EditorHooks): Promise<EditorChoi
     };
     const checkNow = async (): Promise<number> => {
       if (problem()) return 0;
-      say('Checking with the solver…');
+      say(tr('editor.checking'));
       const par = await hooks.check(draftLevel(d));
       d.par = Math.max(0, par);
       hooks.save(d);
-      if (par > 0) say(`Solvable · par ${par}`);
-      else if (par === 0) say('No solution: something is stuck or out of reach.', true);
-      else say('Too big for the solver to be sure. You can still play it.', true);
+      if (par > 0) say(tr('editor.solvable', { par }));
+      else if (par === 0) say(tr('editor.noSolution'), true);
+      else say(tr('editor.tooBig'), true);
       return par;
     };
     el.onclick = async (e) => {

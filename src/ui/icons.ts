@@ -28,6 +28,9 @@ const P: Record<string, string> = {
   plusSquare: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
   hammer: '<path d="m14 6 4 4"/><path d="M15.5 4.5 13 2 9 6l2.5 2.5"/><path d="M16 8 5 19a1.4 1.4 0 0 1-2-2L14 6"/><path d="m15.5 4.5 4 4L21 7l-4-4Z"/>',
   replay: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/>',
+  clock: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/>',
+  skip: '<path d="m5 5 9 7-9 7Z"/><path d="M18 5v14"/>',
 };
 
 /** An inline SVG icon (`.ic`, display: block; inside text, make it inline-block). */

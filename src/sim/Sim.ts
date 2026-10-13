@@ -46,7 +46,21 @@ export const EVENT = {
   /** A door opened or closed. */
   open: 8192,
   close: 16384,
+  /** A crate was pulled (pull rules). The top bit of the Int16 events: it reads back as 0x8000 under `&`. */
+  pull: 32768,
 } as const;
+
+/** How many inputs a level has: 4 directions, and 4 pulls on pull levels (dir + 4). */
+export const inputCount = (g: Grid) => (g.pull ? 8 : 4);
+
+/** The input of a LURD letter: lowercase moves; uppercase pushes (same input) or pulls (dir + 4). */
+export function inputOf(g: Grid, c: string): number {
+  const d = DIRS.indexOf(c.toLowerCase());
+  return d >= 0 && g.pull && c !== c.toLowerCase() ? d + 4 : d;
+}
+
+/** Moves crates (a push or a pull): written uppercase in LURD. */
+export const MOVED_CRATE = EVENT.push | EVENT.pull;
 
 /**
  * The state as a flat array. The header, then one (cell, z) pair per crate. New sections go
@@ -313,18 +327,32 @@ function convey(g: Grid, b: Int16Array, on: boolean[]): number {
 }
 
 /** One move. Returns the new state, or null when the move is blocked (nothing changes). */
-export function step(g: Grid, prev: Int16Array, dir: number): Int16Array | null {
+export function step(g: Grid, prev: Int16Array, input: number): Int16Array | null {
   const before = worldOf(g, prev);
   const on = before.on;
   const from = prev[S.cell];
   const e = prev[S.z];
+  const pulling = input >= 4;
+  const dir = input & 3;
   const to = neighbour(g, from, dir);
   if (to < 0 || g.floor[to] === VOID || blocked(g, prev, on, to)) return null;
   const b = new Int16Array(prev);
   let ev = 0;
   b[S.pushed] = -1;
   const crate = crateAt(b, to, e);
-  if (crate >= 0) {
+  if (pulling) {
+    // A pull: a crate right behind, nothing on it, and level ground ahead to step onto.
+    if (!g.pull) return null;
+    const back = neighbour(g, from, (dir + 2) % 4);
+    const k = back < 0 ? -1 : crateAt(b, back, e);
+    if (k < 0 || crateAt(b, back, e + 1) >= 0 || crate >= 0 || isHole(g, b, to) || surface(g, b, to) !== e) return null;
+    b[S.cell] = to;
+    b[S.z] = e;
+    b[S.pushes]++;
+    b[S.pushed] = k;
+    ev |= EVENT.pull | placeCrate(g, b, on, k, from, dir, true);
+  } else if (crate >= 0) {
+    if (g.pull) return null;
     // A push: nothing on top of the crate, and room for it at this level beyond.
     if (crateAt(b, to, e + 1) >= 0) return null;
     const beyond = neighbour(g, to, dir);
@@ -342,7 +370,8 @@ export function step(g: Grid, prev: Int16Array, dir: number): Int16Array | null 
   b[S.cell] = to;
   b[S.z] = surface(g, b, to);
   ev |= settlePlayer(g, b, on, dir);
-  b[S.facing] = dir;
+  // Pulling, the pusher walks backwards, facing the crate.
+  b[S.facing] = pulling ? (dir + 2) % 4 : dir;
   b[S.moves]++;
   ev |= convey(g, b, on) | EVENT.step;
   for (const c of g.goals) {
@@ -474,17 +503,17 @@ export class Sim {
   get moves(): string {
     let out = '';
     for (let f = 0; f < this.frame; f++) {
-      const c = DIRS[this.inputs[f]];
-      out += this.history[f + 1][S.events] & EVENT.push ? c.toUpperCase() : c;
+      const c = DIRS[this.inputs[f] & 3];
+      out += this.history[f + 1][S.events] & MOVED_CRATE ? c.toUpperCase() : c;
     }
     return out;
   }
 
-  /** Plays a LURD string (case is ignored); returns how many moves were played. */
+  /** Plays a LURD string (case matters only on pull levels: uppercase pulls); returns how many moves were played. */
   play(lurd: string): number {
     let n = 0;
-    for (const c of lurd.toLowerCase()) {
-      const d = DIRS.indexOf(c);
+    for (const c of lurd) {
+      const d = inputOf(this.grid, c);
       if (d < 0 || !this.move(d)) break;
       n++;
     }

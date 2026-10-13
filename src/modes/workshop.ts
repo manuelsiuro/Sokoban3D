@@ -8,6 +8,7 @@ import { parseLevel } from '../sim/grid';
 import { initialState } from '../sim/Sim';
 import { newDraft, showEditor, type Draft } from '../ui/screens/editor';
 import { play } from './run';
+import { t } from '../i18n';
 
 /** The workshop: edit, test-play, come back to the same draft. */
 export async function workshopFlow() {
@@ -24,11 +25,11 @@ export async function workshopFlow() {
         const r = await hint(level, initialState(parseLevel(level)));
         return r.solution ? r.solution.length : r.complete ? 0 : -1;
       },
-      share: async (level, levelPar) => shareText(`Try my Cratelands level “${level.name}”${levelPar ? ` (par ${levelPar})` : ''}:`, shareLink(level, levelPar)),
+      share: async (level, levelPar) => shareText(t('workshop.share', { name: level.name, par: levelPar ? t('workshop.sharePar', { par: levelPar }) : '' }), shareLink(level, levelPar)),
       click,
     });
     if (choice.type === 'back') return;
-    const r = await play(choice.level, 'Workshop', choice.par);
+    const r = await play(choice.level, t('workshop.label'), choice.par);
     if (!r) continue;
     markBuilt();
     const extra = newTrophies();

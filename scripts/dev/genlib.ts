@@ -7,5 +7,5 @@ const layer = (name: string, rows: string[] | undefined, blank: RegExp) => (rows
 
 /** A level's layers as TypeScript (blank layers left out). */
 export function levelSource(l: LevelDef) {
-  return `${layer('map', l.map, /^$/)}${layer('heights', l.heights, /^0*$/)}${layer('tiles', l.tiles, /^ *$/)}${layer('kinds', l.kinds, /^ *$/)}`;
+  return `${layer('map', l.map, /^$/)}${layer('heights', l.heights, /^0*$/)}${layer('tiles', l.tiles, /^ *$/)}${layer('kinds', l.kinds, /^ *$/)}${l.rules ? `    rules: '${l.rules}',\n` : ''}`;
 }

@@ -1,5 +1,5 @@
 import { DIRS, VOID, type Grid } from './grid';
-import { EVENT, crateCells, eventsOf, initialState, isSolved, neighbour, stateKey, step } from './Sim';
+import { MOVED_CRATE, crateCells, eventsOf, initialState, inputCount, isSolved, neighbour, stateKey, step } from './Sim';
 
 /**
  * Finds the fewest-moves solution by breadth-first search over the real rules (`step`), so
@@ -49,8 +49,8 @@ export function solve(g: Grid, opts: { maxStates?: number; maxDepth?: number; st
   const path = (i: number) => {
     let out = '';
     for (; parent[i] >= 0; i = parent[i]) {
-      const c = DIRS[via[i]];
-      out = (eventsOf(states[i]) & EVENT.push ? c.toUpperCase() : c) + out;
+      const c = DIRS[via[i] & 3];
+      out = (eventsOf(states[i]) & MOVED_CRATE ? c.toUpperCase() : c) + out;
     }
     return out;
   };
@@ -58,12 +58,12 @@ export function solve(g: Grid, opts: { maxStates?: number; maxDepth?: number; st
   for (let head = 0; head < states.length; head++) {
     if (depth[head] >= maxDepth) continue;
     const b = states[head];
-    for (let d = 0; d < 4; d++) {
+    for (let d = 0, n = inputCount(g); d < n; d++) {
       const next = step(g, b, d);
       if (!next) continue;
       const key = stateKey(g, next);
       if (seen.has(key)) continue;
-      if (live && eventsOf(next) & EVENT.push && crateCells(next).some((c) => c >= 0 && !live[c])) continue;
+      if (live && eventsOf(next) & MOVED_CRATE && crateCells(next).some((c) => c >= 0 && !live[c])) continue;
       seen.add(key);
       states.push(next);
       parent.push(head);

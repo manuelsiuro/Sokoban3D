@@ -8,6 +8,7 @@ import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
 import { KEYS as STORE, readJSON, writeJSON } from '../game/storage';
 import { h } from '../ui/dom';
+import { levelText, t } from '../i18n';
 
 /** Before a new world's first level (after the Meadow): a card on what its mechanic does. Once. */
 async function introduce(level: LevelDef) {
@@ -24,7 +25,7 @@ async function introduce(level: LevelDef) {
   const el = h(
     'div',
     'modal',
-    `<div class="card intro-card"><p class="intro-kicker">World ${w + 1} · new</p><h2>${world.name}</h2><p class="intro-mech">${world.mechanic}</p><p class="intro-tip">${level.tip}</p><div class="actions"><button class="big-btn primary" data-done>Let's go</button></div></div>`,
+    `<div class="card intro-card"><p class="intro-kicker">${t('intro.kicker', { n: w + 1 })}</p><h2>${world.name}</h2><p class="intro-mech">${world.mechanic}</p><p class="intro-tip">${levelText(level).tip}</p><div class="actions"><button class="big-btn primary" data-done>${t('intro.go')}</button></div></div>`,
   );
   document.body.append(el);
   await new Promise<void>((resolve) => {
@@ -58,7 +59,7 @@ export async function levelFlow(index: number): Promise<number> {
     // Watching the best run comes back to the same summary.
     while (choice === 'watch') {
       const run = loadProgress()[level.id]?.run;
-      if (run) await play(level, `${campaignLabel(level)} · replay`, p, { autoplay: run });
+      if (run) await play(level, t('campaign.replay', { label: campaignLabel(level) }), p, { autoplay: run });
       choice = await summary({ stars, moves: s.moves, pushes: s.pushes, par: p, limits: starLimits(p), best: false, clean, hasNext: next >= 0, extra: '', watch: true });
     }
     if (choice === 'levels') return index;
@@ -88,7 +89,7 @@ export async function worldsFlow(start: number) {
         missing: Math.max(0, worldGate(k) - total),
         gate: worldGate(k),
         soon: levels.length === 0,
-        levels: levels.map(({ l, i }) => ({ index: i, name: l.name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
+        levels: levels.map(({ l, i }) => ({ index: i, name: levelText(l).name, difficulty: l.difficulty, stars: p[l.id]?.stars ?? 0, unlocked: isUnlocked(i, p), best: p[l.id]?.moves ?? 0, par: par(i), clean: !!p[l.id]?.clean })),
       };
     });
     const i = await showWorlds(cards, at, { select: (k) => (map.select(k), sound.setMusic(settings.music, settings.musicVolume, WORLDS[k].id)), pick: (x, y) => map.pick(x, y) }, click);

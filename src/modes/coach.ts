@@ -1,4 +1,5 @@
 import { TOUCH } from '../ui/dom';
+import { t } from '../i18n';
 
 /**
  * The tutorial: on the first Meadow levels, short prompts that each wait for the player to
@@ -6,7 +7,8 @@ import { TOUCH } from '../ui/dom';
  */
 export type CoachEvent = 'move' | 'goal' | 'undo';
 interface Step {
-  text: string;
+  /** Looked up when shown (the language may change). */
+  text: () => string;
   /** Shown once this many moves are made (default: at once). */
   after?: number;
   /** Done when this happens (or after `ms`). */
@@ -16,11 +18,11 @@ interface Step {
 
 const STEPS: Record<string, Step[]> = {
   'meadow-1': [
-    { text: TOUCH ? 'Swipe, use the arrows, or tap where to go.' : 'Walk with the arrow keys or WASD, or click where to go.', until: 'move' },
-    { text: 'Walk into the crate to push it onto the glowing pad.', until: 'goal' },
+    { text: () => t(TOUCH ? 'coach.moveTouch' : 'coach.moveKeys'), until: 'move' },
+    { text: () => t('coach.push'), until: 'goal' },
   ],
-  'meadow-2': [{ text: `Pushed it the wrong way? Undo with ${TOUCH ? '↶' : 'Z'}: it's free.`, after: 2, until: 'undo', ms: 9000 }],
-  'meadow-3': [{ text: `Lost? ${TOUCH ? 'The bulb' : 'H (or the bulb)'} shows the next move, but a hint takes the "no undo" badge.`, ms: 8000 }],
+  'meadow-2': [{ text: () => t('coach.undo', { key: TOUCH ? '↶' : 'Z' }), after: 2, until: 'undo', ms: 9000 }],
+  'meadow-3': [{ text: () => t('coach.hint', { key: t(TOUCH ? 'coach.bulb' : 'coach.bulbKey') }), ms: 8000 }],
 };
 
 export class Coach {
@@ -62,7 +64,7 @@ export class Coach {
     const s = this.steps[this.k];
     if (!s || this.shown || this.moves < (s.after ?? 0)) return;
     this.shown = true;
-    this.say(s.text, s.ms ?? 60000);
+    this.say(s.text(), s.ms ?? 60000);
     if (s.ms) this.timer = window.setTimeout(() => this.next(), s.ms);
   }
 }

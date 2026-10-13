@@ -1,5 +1,6 @@
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
+import { t } from '../../i18n';
 
 export interface LevelCard {
   /** Index in the campaign. */
@@ -36,15 +37,15 @@ export interface MapHooks {
   pick: (x: number, y: number) => number;
 }
 
-const pips = (n: number) => `<span class="level-diff" title="Difficulty ${n} of 5">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+const pips = (n: number) => `<span class="level-diff" title="${t('worlds.difficulty', { n })}">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= n ? 'on' : ''}"></i>`).join('')}</span>`;
 const state = (l: LevelCard, next: boolean) => (!l.unlocked ? 'locked' : l.stars >= 3 ? 'solved perfect' : l.stars ? 'solved' : next ? 'next' : '');
 const card = (l: LevelCard, i: number, all: LevelCard[]) => `<button class="level-card ${state(l, all.find((x) => x.unlocked && !x.stars) === l)}" data-i="${l.index}" ${l.unlocked ? '' : 'disabled'} style="animation-delay:${i * 0.03}s">
     <span class="level-num">${l.unlocked ? i + 1 : icon('lock', 20)}</span>
-    ${l.clean ? `<span class="level-badge" title="Solved without undo">${icon('feather', 18)}</span>` : ''}
+    ${l.clean ? `<span class="level-badge" title="${t('worlds.clean')}">${icon('feather', 18)}</span>` : ''}
     <span class="level-name">${l.name}</span>
     ${pips(l.difficulty)}
     <span class="level-stars">${[0, 1, 2].map((s) => `<i class="${s < l.stars ? 'on' : ''}">${icon('star', 18)}</i>`).join('')}</span>
-    <span class="level-best">${l.unlocked ? (l.best ? `Best ${l.best} · par ${l.par}` : `Par ${l.par}`) : 'Solve the one before'}</span>
+    <span class="level-best">${l.unlocked ? (l.best ? t('worlds.best', { best: l.best, par: l.par }) : t('worlds.par', { par: l.par })) : t('worlds.solveBefore')}</span>
   </button>`;
 
 /**
@@ -59,8 +60,8 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
     'div',
     'worlds',
     `<div class="worlds-head">
-      <button class="icon-btn" data-back aria-label="Back">${icon('chevronLeft')}</button>
-      <h2>Worlds</h2>
+      <button class="icon-btn" data-back aria-label="${t('common.back')}">${icon('chevronLeft')}</button>
+      <h2>${t('worlds.title')}</h2>
       <span class="pill big">${icon('star', 16)} ${total} / ${max}</span>
     </div>
     <div class="world-card"></div>
@@ -73,22 +74,22 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
     const w = worlds[k];
     const done = w.maxStars ? (w.stars / w.maxStars) * 100 : 0;
     const lock = w.soon
-      ? '<p class="world-lock">Coming soon</p>'
+      ? `<p class="world-lock">${t('worlds.soon')}</p>`
       : !w.open
-        ? `<div class="world-lock">${icon('lock', 16)} <span>${w.missing} more ${w.missing === 1 ? 'star' : 'stars'} to open</span><i style="--done:${((1 - w.missing / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>`
+        ? `<div class="world-lock">${icon('lock', 16)} <span>${w.missing === 1 ? t('worlds.missingOne') : t('worlds.missing', { n: w.missing })}</span><i style="--done:${((1 - w.missing / Math.max(1, w.gate)) * 100).toFixed(1)}%"></i></div>`
         : '';
     cardEl.innerHTML = `
-      <button class="icon-btn world-prev" data-step="-1" aria-label="Previous world" ${k === 0 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
+      <button class="icon-btn world-prev" data-step="-1" aria-label="${t('worlds.prev')}" ${k === 0 ? 'disabled' : ''}>${icon('chevronLeft')}</button>
       <div class="world-info">
-        <small>World ${k + 1}</small>
+        <small>${t('worlds.world', { n: k + 1 })}</small>
         <b>${w.name}</b>
         <span>${w.mechanic}</span>
         ${w.open ? `<span class="world-stars">${icon('star', 14)} ${w.stars}/${w.maxStars}<i style="--done:${done.toFixed(1)}%"></i></span>` : ''}
         ${lock}
-        ${w.open ? `<button class="big-btn primary" data-open>${icon('play', 16)} Levels</button>` : ''}
+        ${w.open ? `<button class="big-btn primary" data-open>${icon('play', 16)} ${t('worlds.levels')}</button>` : ''}
       </div>
-      <button class="icon-btn world-next" data-step="1" aria-label="Next world" ${k === worlds.length - 1 ? 'disabled' : ''}>${icon('chevronRight')}</button>`;
-    sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${w.mechanic}</small></h3><button class="icon-btn" data-close aria-label="Close">${icon('close')}</button></div>
+      <button class="icon-btn world-next" data-step="1" aria-label="${t('worlds.next')}" ${k === worlds.length - 1 ? 'disabled' : ''}>${icon('chevronRight')}</button>`;
+    sheetInner.innerHTML = `<div class="sheet-head"><h3>${w.name}<small>${w.mechanic}</small></h3><button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button></div>
       <div class="level-grid">${w.levels.map((l, i) => card(l, i, w.levels)).join('')}</div>`;
   };
   const go = (to: number) => {
@@ -147,8 +148,7 @@ export function showWorlds(worlds: WorldCard[], start: { world: number; sheet: b
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('pointerup', onUp);
     el.onclick = (e) => {
-      const t = e.target as HTMLElement;
-      const btn = t.closest<HTMLElement>('button');
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('button');
       if (!btn) return;
       click();
       if (btn.dataset.back !== undefined) finish(null);

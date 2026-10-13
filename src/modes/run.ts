@@ -7,6 +7,7 @@ import { startGamepad } from '../app/gamepad';
 import { TILE } from '../sim/grid';
 import { walkTo } from '../game/path';
 import { Coach } from './coach';
+import { levelText, t, type Key } from '../i18n';
 import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
 import { TOUCH, h, setText } from '../ui/dom';
@@ -21,34 +22,40 @@ const hud = h(
   'div',
   'hud hidden',
   `<div class="hud-top">
-     <button class="icon-btn" data-a="back" aria-label="Back to the levels">${icon('chevronLeft')}</button>
+     <button class="icon-btn" data-a="back" data-l="hud.back">${icon('chevronLeft')}</button>
      <div class="hud-title"><small></small><b></b></div>
      <span class="pill big hud-moves"><b>0</b>&nbsp;<small>/ par 0</small></span>
    </div>
    <div class="hud-bar">
-     <button class="icon-btn" data-a="undo" aria-label="Undo (Z)">${icon('undo')}</button>
-     <button class="icon-btn" data-a="restart" aria-label="Restart (R)">${icon('replay')}</button>
-     <button class="icon-btn" data-a="hint" aria-label="Hint (H)">${icon('bulb')}</button>
+     <button class="icon-btn" data-a="undo" data-l="hud.undo">${icon('undo')}</button>
+     <button class="icon-btn" data-a="restart" data-l="hud.restart">${icon('replay')}</button>
+     <button class="icon-btn" data-a="hint" data-l="hud.hint">${icon('bulb')}</button>
      <span class="sep"></span>
-     <button class="icon-btn" data-a="left" aria-label="Turn the camera (Q)">${icon('rotateLeft')}</button>
-     <button class="icon-btn" data-a="right" aria-label="Turn the camera (E)">${icon('rotateRight')}</button>
+     <button class="icon-btn" data-a="left" data-l="hud.turnLeft">${icon('rotateLeft')}</button>
+     <button class="icon-btn" data-a="right" data-l="hud.turnRight">${icon('rotateRight')}</button>
    </div>
    <p class="hud-tip gone"></p>
    ${
      TOUCH
-       ? `<div class="dpad">${[0, 1, 2, 3].map((d) => `<button data-d="${d}" aria-label="${['Up', 'Right', 'Down', 'Left'][d]}">${icon(['up', 'chevronRight', 'down', 'chevronLeft'][d], 26)}</button>`).join('')}</div>`
-       : '<div class="hud-keys"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>WASD</kbd> move<br><kbd>Z</kbd> undo · <kbd>Y</kbd> redo · <kbd>R</kbd> restart · <kbd>H</kbd> hint<br><kbd>Q</kbd> <kbd>E</kbd> turn the camera</div>'
+       ? `<div class="dpad">${[0, 1, 2, 3].map((d) => `<button data-d="${d}" data-l="${['hud.up', 'hud.right', 'hud.down', 'hud.left'][d]}">${icon(['up', 'chevronRight', 'down', 'chevronLeft'][d], 26)}</button>`).join('')}</div>`
+       : '<div class="hud-keys"></div>'
    }`,
 );
 document.body.append(hud);
 const $ = <T extends Element = HTMLElement>(sel: string) => hud.querySelector<T & HTMLElement>(sel)!;
+/** Puts the HUD's labels in the current language (the HUD is built once; the language can change). */
+function labelHud() {
+  for (const b of hud.querySelectorAll<HTMLElement>('[data-l]')) b.setAttribute('aria-label', t(b.dataset.l as Key));
+  const keys = hud.querySelector('.hud-keys');
+  if (keys) keys.innerHTML = t('hud.keys');
+}
 const tip = $('.hud-tip');
 let tipTimer = 0;
 
 function updateHud() {
   const s = screen.shown;
   setText($('.hud-moves b'), String(s.moves));
-  setText($('.hud-moves small'), run?.par ? `/ par ${run.par}` : 'moves');
+  setText($('.hud-moves small'), run?.par ? t('hud.par', { par: run.par }) : t('hud.moves'));
   $<HTMLButtonElement>('[data-a="undo"]').disabled = screen.sim.frame === 0;
   if (run?.ghost) view.setGhost(run.ghost[Math.min(s.moves, run.ghost.length - 1)]);
 }
@@ -86,9 +93,11 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
   screen.mode = 'level';
   view.idle = false;
   view.intro();
+  labelHud();
+  const text = levelText(level);
   setText($('.hud-title small'), label);
-  setText($('.hud-title b'), level.name);
-  tip.textContent = level.tip;
+  setText($('.hud-title b'), text.name);
+  tip.textContent = text.tip;
   tip.classList.remove('gone');
   clearTimeout(tipTimer);
   tipTimer = window.setTimeout(() => tip.classList.add('gone'), 9000);
@@ -103,7 +112,7 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
       const moves = opts.autoplay.toLowerCase();
       let k = 0;
       const r = run;
-      say('Replay of your best run', 4000);
+      say(t('hud.replay'), 4000);
       r.timer = window.setInterval(() => {
         if (run !== r || r.over || k >= moves.length) return clearInterval(r.timer);
         const prev = screen.shown;
@@ -279,15 +288,17 @@ async function askHint() {
   click();
   const asked = screen.sim.frame;
   const r = run;
-  say('Thinking\u2026', 20000);
+  say(t('hud.thinking'), 20000);
   const answer = await hint(screen.sim.level, screen.sim.raw);
   if (run !== r || screen.sim.frame !== asked || r.over) return;
   r.clean = false;
   if (answer.solution) {
     const c = answer.solution[0];
     view.showHint(DIRS.indexOf(c.toLowerCase()));
-    say(`${c === c.toUpperCase() ? 'Push' : 'Step'} that way · ${answer.solution.length} ${answer.solution.length === 1 ? 'move' : 'moves'} to go from here`);
-  } else say(answer.complete ? 'No way to solve it from here: undo a few moves.' : 'Too many paths to check from here. Try undoing a little.');
+    const n = answer.solution.length;
+    const push = c === c.toUpperCase();
+    say(n === 1 ? t(push ? 'hud.hintPushOne' : 'hud.hintStepOne') : t(push ? 'hud.hintPush' : 'hud.hintStep', { n }));
+  } else say(answer.complete ? t('hud.stuck') : t('hud.tooMany'));
 }
 
 const KEYS: Record<string, number> = { ArrowUp: 0, KeyW: 0, ArrowRight: 1, KeyD: 1, ArrowDown: 2, KeyS: 2, ArrowLeft: 3, KeyA: 3 };

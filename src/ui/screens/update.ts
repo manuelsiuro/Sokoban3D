@@ -1,5 +1,6 @@
 import { h } from '../dom';
 import { icon } from '../icons';
+import { t } from '../../i18n';
 
 /**
  * "A new version is ready" banner (the same system as Line Rider 3D). It waits until no
@@ -12,15 +13,15 @@ export function showUpdate(version: string | null, restart: () => void) {
     'div',
     'update-banner',
     `<span class="update-ic">${icon('download', 20)}</span>
-     <span class="update-text"><b>New version${version ? ` v${version}` : ''} is ready</b><small>Restart to get the latest levels and fixes.</small></span>
-     <button class="big-btn primary small-btn" data-u="restart">Restart</button>
-     <button class="icon-btn flat" data-u="later" aria-label="Later">${icon('close', 18)}</button>`,
+     <span class="update-text"><b>${t('update.ready', { v: version ? ` v${version}` : '' })}</b><small>${t('update.sub')}</small></span>
+     <button class="big-btn primary small-btn" data-u="restart">${t('update.restart')}</button>
+     <button class="icon-btn flat" data-u="later" aria-label="${t('update.later')}">${icon('close', 18)}</button>`,
   );
   el.onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-u]');
     if (!b) return;
     if (b.dataset.u === 'restart') {
-      b.textContent = 'Restarting…';
+      b.textContent = t('update.restarting');
       restart();
     } else {
       el.classList.add('leaving');

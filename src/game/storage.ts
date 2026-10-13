@@ -16,6 +16,8 @@ export const KEYS = {
   achievements: `${PREFIX}.achievements`,
   /** Worlds whose introduction card was shown. */
   seen: `${PREFIX}.seen`,
+  /** The Expedition run in progress and the best one. */
+  expedition: `${PREFIX}.expedition`,
   // Preferences and creations (kept on reset).
   settings: `${PREFIX}.settings`,
   editor: `${PREFIX}.editor`,
@@ -26,7 +28,7 @@ export const KEYS = {
 export type StorageKey = (typeof KEYS)[keyof typeof KEYS];
 
 /** The keys "Reset progress" wipes. */
-export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.daily, KEYS.achievements, KEYS.seen];
+export const PROGRESS_KEYS: StorageKey[] = [KEYS.progress, KEYS.daily, KEYS.achievements, KEYS.seen, KEYS.expedition];
 
 export function readText(key: StorageKey): string | null {
   try {

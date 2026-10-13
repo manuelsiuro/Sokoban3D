@@ -1,7 +1,7 @@
 /**
  * The room generator (the daily puzzle, scripts/dev/generate.ts, scripts/dev/buildworld.ts):
  * random walls, crates, goals and mechanics, solved by the real solver. Only rooms whose
- * optimal solution uses every requested mechanic are kept.
+ * optimal solution uses every requested mechanic are kept. `pull: 1` makes pull-rule rooms.
  */
 import { parseLevel, TILE } from './grid';
 import { liveCells, solve } from './solver';
@@ -9,7 +9,7 @@ import { EVENT, Sim } from './Sim';
 import { rng } from './rng';
 import type { LevelDef } from '../levels/types';
 
-export const DEFAULTS: Record<string, number> = { crates: 3, w: 6, h: 6, walls: 0.18, ice: 0, pits: 0, lava: 0, doors: 0, conveyors: 0, teleports: 0, gates: 0, colors: 0, terraces: 0, holes: 0, lasers: 0, tries: 500, seed: 1, top: 5, states: 400000 };
+export const DEFAULTS: Record<string, number> = { crates: 3, w: 6, h: 6, walls: 0.18, ice: 0, pits: 0, lava: 0, doors: 0, conveyors: 0, teleports: 0, gates: 0, colors: 0, terraces: 0, holes: 0, lasers: 0, pull: 0, tries: 500, seed: 1, top: 5, states: 400000 };
 
 export interface Cand { level: LevelDef; par: number; pushes: number; changes: number; states: number; score: number; solution: string }
 
@@ -105,6 +105,7 @@ export function propose(options: Partial<Record<string, number>>): Cand[] {
       tiles: tiles.map((r) => r.join('')),
       kinds: kinds.map((r) => r.join('')),
       heights: heights.map((r) => r.join('')),
+      ...(opt.pull ? { rules: 'pull' as const } : {}),
     });
     // Crates: on squares a crate can still be pushed from (on classic rooms).
     let live: Uint8Array | null = null;
@@ -149,7 +150,8 @@ export function propose(options: Partial<Record<string, number>>): Cand[] {
     let used = 0;
     let throughGate = false;
     let throughDoor = false;
-    for (const c of r.solution.toLowerCase()) {
+    // Case matters: on pull rooms uppercase letters are pulls.
+    for (const c of r.solution) {
       sim.play(c);
       const s = sim.state;
       used |= s.events;

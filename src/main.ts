@@ -10,6 +10,7 @@ import { currentStreak, loadDaily } from './game/dailyProgress';
 import { decodeLevel } from './game/share';
 import { isWorldOpen, loadProgress, nextLevel, totalStars, worldLevels } from './game/progress';
 import { showTitle } from './ui/screens/title';
+import { levelText, setLang, t } from './i18n';
 import { TOUCH } from './ui/dom';
 import { setHaptics } from './app/haptics';
 import { symbols } from './render/mechanics';
@@ -60,7 +61,7 @@ async function titleFlow() {
         levels: LEVELS.length,
         worlds: WORLDS.length,
         worldsOpen: WORLDS.filter((_, k) => isWorldOpen(k, p)).length,
-        next: next === null ? null : { name: `${LEVELS[next].name} (${WORLDS[worldIndex(next)].name})`, number: worldLevels(LEVELS[next].world).findIndex(({ i }) => i === next) + 1 },
+        next: next === null ? null : { name: t('title.nextName', { name: levelText(LEVELS[next]).name, world: WORLDS[worldIndex(next)].name }), number: worldLevels(LEVELS[next].world).findIndex(({ i }) => i === next) + 1 },
         fresh: Object.keys(p).length === 0,
         muted: settings.muted,
         daily: { streak: currentStreak(date), stars: loadDaily().results[date]?.stars ?? 0 },
@@ -100,6 +101,7 @@ async function titleFlow() {
           applySound();
           view.reducedMotion = s.reducedMotion;
           view.shake = s.shake;
+          setLang(s.lang);
           symbols.on = s.symbols;
           setHaptics(s.haptics);
           if (s.quality !== shownQuality) view.setQuality((shownQuality = s.quality), TOUCH);

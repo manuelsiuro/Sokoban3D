@@ -103,6 +103,15 @@ export const BIOMES: Record<string, Biome> = {
     decor: ['gear', 'gear', 'lamp', 'lamp', 'pillar'],
     air: { clouds: { top: 0xfff1d8, belly: 0xc9a98a, count: 7 }, motes: { color: 0xffd98a, count: 40, rise: 0.06, size: 0.06, glow: true }, far: 'gears' },
   },
+  reverse: {
+    skyTop: 0x3d2f6e, skyBottom: 0xf2a6b8, fog: 0xd9a0b8,
+    ground: 0x9ed8c4, ground2: 0x93cfba, soil: 0x7a5a8c, rock: 0x5e4a72,
+    wall: 'hedge', wallColor: 0x7a5fb0, wallTop: 0x9a80d0,
+    crate: 0xd8a868, crateTrim: 0x7a5432, goal: 0xff8fd0,
+    sun: 0xffd2c2, sunIntensity: 2.0, ambient: 1.2,
+    decor: ['tree', 'bush', 'flower', 'flower', 'mushroom', 'grass'],
+    air: { clouds: { top: 0xffe0ec, belly: 0xb88ab8, count: 8 }, motes: { color: 0xffc2e8, count: 90, rise: 0.1, size: 0.08, glow: true }, far: 'islands' },
+  },
 };
 
 export const biomeOf = (world: string) => BIOMES[world] ?? BIOMES.meadow;

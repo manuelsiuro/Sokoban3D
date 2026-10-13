@@ -14,6 +14,7 @@ import { loadDaily } from '../game/dailyProgress';
 import { loadProgress } from '../game/progress';
 import { TOUCH, closeOverlay, h } from '../ui/dom';
 import { icon } from '../ui/icons';
+import { setLang, t } from '../i18n';
 import { showSummary, type SummaryInfo } from '../ui/screens/summary';
 import { buzz, setHaptics } from './haptics';
 
@@ -22,6 +23,7 @@ import { buzz, setHaptics } from './haptics';
  * scenes, and the level on screen. Modes import from here instead of from each other.
  */
 export const settings = loadSettings();
+setLang(settings.lang);
 export const sound = new Sound();
 export const applySound = () => {
   sound.setVolume(settings.muted ? 0 : settings.sfxVolume);
@@ -88,7 +90,7 @@ export function newTrophies(): string {
       buzz('win');
     }, 900);
   }
-  fresh.forEach((a, k) => setTimeout(() => toast(`${icon('trophy', 18)} <span>${a.name}${a.reward ? ' · new look in Trophies' : ''}</span>`), 600 + k * 900));
+  fresh.forEach((a, k) => setTimeout(() => toast(`${icon('trophy', 18)} <span>${a.name}${a.reward ? t('toast.newLook') : ''}</span>`), 600 + k * 900));
   return fresh.length ? `${icon('trophy', 14)} ${fresh.map((a) => a.name).join(', ')}` : '';
 }
 
@@ -105,12 +107,12 @@ export async function shareText(text: string, url?: string): Promise<string> {
   try {
     if (navigator.share && TOUCH) {
       await navigator.share({ text, url });
-      return 'Shared!';
+      return t('share.shared');
     }
     await navigator.clipboard.writeText(url ? `${text} ${url}` : text);
-    return 'Copied!';
+    return t('share.copied');
   } catch {
-    return 'Could not share';
+    return t('share.failed');
   }
 }
 

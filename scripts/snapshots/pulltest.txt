@@ -1,0 +1,9 @@
+ok   no push on a pull level
+ok   a pull moves pusher and crate
+ok   pulling faces the crate
+ok   a pull with nothing behind is blocked
+ok   push rules: push works
+ok   push rules: no pull input
+solution ullldLL (21 states)
+ok   solution replays and solves
+ok   moves string round-trips

@@ -1,6 +1,7 @@
 import { ACHIEVEMENTS, OUTFITS, SKINS, type Ctx } from '../../game/achievements';
 import { closeOverlay, h } from '../dom';
 import { icon } from '../icons';
+import { t } from '../../i18n';
 
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 
@@ -12,7 +13,7 @@ export function showTrophies(
   chosen: { skin: string; outfit: string },
   hooks: { choose: (kind: 'skin' | 'outfit', id: string) => void; click: () => void },
 ): Promise<void> {
-  const reward = (a: (typeof ACHIEVEMENTS)[number]) => (a.reward?.skin ? `Crate skin: ${SKINS.find((s) => s.id === a.reward!.skin)?.name}` : a.reward?.outfit ? `Outfit: ${OUTFITS.find((o) => o.id === a.reward!.outfit)?.name}` : '');
+  const reward = (a: (typeof ACHIEVEMENTS)[number]) => (a.reward?.skin ? t('trophies.skin', { name: SKINS.find((s) => s.id === a.reward!.skin)?.name ?? '' }) : a.reward?.outfit ? t('trophies.outfit', { name: OUTFITS.find((o) => o.id === a.reward!.outfit)?.name ?? '' }) : '');
   const item = (a: (typeof ACHIEVEMENTS)[number]) => {
     const n = Math.min(a.goal, a.count(ctx));
     const done = have.has(a.id);
@@ -32,16 +33,16 @@ export function showTrophies(
     'screen',
     `<div class="screen-inner">
       <div class="screen-head">
-        <button class="icon-btn" data-back aria-label="Back">${icon('chevronLeft')}</button>
-        <h2>Trophies</h2>
+        <button class="icon-btn" data-back aria-label="${t('common.back')}">${icon('chevronLeft')}</button>
+        <h2>${t('trophies.title')}</h2>
         <span class="pill big">${icon('trophy', 16)} ${have.size}/${ACHIEVEMENTS.length}</span>
       </div>
-      <h3 class="sub-head">Wardrobe</h3>
-      <p class="swatch-label">Crate skins</p>
+      <h3 class="sub-head">${t('trophies.wardrobe')}</h3>
+      <p class="swatch-label">${t('trophies.skins')}</p>
       <div class="swatches">${SKINS.map((s) => swatch('skin', s.id, s.name, s.crate, s.trim, unlocked.skins.has(s.id), chosen.skin === s.id)).join('')}</div>
-      <p class="swatch-label">Outfits</p>
+      <p class="swatch-label">${t('trophies.outfits')}</p>
       <div class="swatches">${OUTFITS.map((o) => swatch('outfit', o.id, o.name, o.cap, o.suit, unlocked.outfits.has(o.id), chosen.outfit === o.id)).join('')}</div>
-      <h3 class="sub-head">Achievements</h3>
+      <h3 class="sub-head">${t('trophies.achievements')}</h3>
       <div class="trophies">${ACHIEVEMENTS.map(item).join('')}</div>
     </div>`,
   );
