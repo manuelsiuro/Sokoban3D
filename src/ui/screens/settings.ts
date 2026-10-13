@@ -7,7 +7,7 @@ export function showSettings(
   s: Settings,
   hooks: { change: (s: Settings) => void; reset: () => void; install: 'prompt' | 'ios' | null; promptInstall: () => Promise<boolean>; installHelp: () => Promise<void>; click: () => void; tier?: string },
 ): Promise<void> {
-  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
+  const row = (key: 'muted' | 'music' | 'reducedMotion' | 'ghost' | 'shake' | 'haptics' | 'symbols', label: string, on: boolean) => `<label class="set-row"><span>${label}</span><input type="checkbox" data-k="${key}" ${on ? 'checked' : ''}><i class="switch"></i></label>`;
   const slider = (key: 'sfxVolume' | 'musicVolume', label: string) => `<label class="set-row"><span>${label}</span><input type="range" min="0" max="1" step="0.05" value="${s[key]}" data-k="${key}"></label>`;
   const el = h(
     'div',
@@ -24,6 +24,7 @@ export function showSettings(
       <h3 class="set-group">${icon('gamepad', 15)} Play</h3>
       <div class="set-list">
         ${row('ghost', 'Ghost of your best run', s.ghost)}
+        ${row('symbols', 'Color symbols', s.symbols)}
         ${row('shake', 'Screen shake', s.shake)}
         ${typeof navigator.vibrate === 'function' ? row('haptics', 'Vibration', s.haptics) : ''}
         ${row('reducedMotion', 'Reduced motion', s.reducedMotion)}

@@ -12,6 +12,7 @@ import { isWorldOpen, loadProgress, nextLevel, totalStars, worldLevels } from '.
 import { showTitle } from './ui/screens/title';
 import { TOUCH } from './ui/dom';
 import { setHaptics } from './app/haptics';
+import { symbols } from './render/mechanics';
 import { showSettings } from './ui/screens/settings';
 import { showTrophies } from './ui/screens/trophies';
 import { showUpdate } from './ui/screens/update';
@@ -99,6 +100,7 @@ async function titleFlow() {
           applySound();
           view.reducedMotion = s.reducedMotion;
           view.shake = s.shake;
+          symbols.on = s.symbols;
           setHaptics(s.haptics);
           if (s.quality !== shownQuality) view.setQuality((shownQuality = s.quality), TOUCH);
         },

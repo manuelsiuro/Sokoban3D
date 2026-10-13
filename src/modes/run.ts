@@ -3,14 +3,17 @@ import { DIRS } from '../sim/grid';
 import type { LevelDef } from '../levels/types';
 import { hint } from '../app/helper';
 import { buzz } from '../app/haptics';
+import { startGamepad } from '../app/gamepad';
 import { TILE } from '../sim/grid';
+import { walkTo } from '../game/path';
+import { Coach } from './coach';
 import { click, renderer, screen, settings, showLevel, sound, view } from '../app/context';
 import { ghostPath, runSolves, type GhostStep } from '../game/ghost';
 import { TOUCH, h, setText } from '../ui/dom';
 import { icon } from '../ui/icons';
 
 /**
- * Playing a level: the HUD, the input (keys, d-pad, swipes), the sounds of each move, hints,
+ * Playing a level: the HUD, the input (keys, d-pad, swipes, taps, gamepads), the sounds of each move, hints,
  * ghosts and replays. Every mode plays through `play()`.
  */
 // ------------------------------------------------------------------ HUD
@@ -108,12 +111,15 @@ export function play(level: LevelDef, label: string, levelPar: number, opts: { g
       }, 260);
     }
     updateHud();
+    if (coach.start(level.id, !!opts.autoplay)) tip.classList.add('coach');
+    else tip.classList.remove('coach');
   });
 }
 
 function endRun(state: GameState | null) {
   const r = run;
   if (!r) return;
+  stopWalk();
   clearInterval(r.timer);
   view.setGhost(null);
   document.body.classList.remove('is-playing');
@@ -139,7 +145,9 @@ function present(prev: GameState, forward: boolean) {
     }
     else if (e & EVENT.climb) sound.climb();
     else sound.step();
+    coach.on('move');
     if (e & EVENT.goalOn) {
+      coach.on('goal');
       sound.goal();
       buzz('goal');
     }
@@ -160,7 +168,7 @@ function present(prev: GameState, forward: boolean) {
     if (e & (EVENT.open | EVENT.close)) sound.door((e & EVENT.open) !== 0);
   } else sound.undo();
   updateHud();
-  if (s.moves >= 3 && s.moves < 4) tip.classList.add('gone');
+  if (s.moves >= 3 && s.moves < 4 && !tip.classList.contains('coach')) tip.classList.add('gone');
   if (forward && s.events & EVENT.win && run) {
     run.over = true;
     sound.win();
@@ -170,19 +178,60 @@ function present(prev: GameState, forward: boolean) {
   }
 }
 
-/** A move in a screen direction (0 up, 1 right, 2 down, 3 left). */
+/** A move in a screen direction (0 up, 1 right, 2 down, 3 left). Stops a tapped walk. */
 function move(dir: number) {
-  if (!run || run.over || run.watching) return;
+  stopWalk();
+  moveGrid(view.screenDir(dir));
+}
+
+/** A move in a grid direction; false when blocked. */
+function moveGrid(d: number): boolean {
+  if (!run || run.over || run.watching) return false;
   const prev = screen.shown;
-  if (screen.sim.move(view.screenDir(dir))) present(prev, true);
-  else {
-    sound.bump();
-    buzz('bump');
+  if (screen.sim.move(d)) {
+    present(prev, true);
+    return true;
   }
+  sound.bump();
+  buzz('bump');
+  return false;
+}
+
+// Tap-to-move: a tap next to the pusher steps (or pushes) that way; further away, it walks
+// there by the shortest way that moves no crate, one move at the animation's pace.
+let walk = 0;
+function stopWalk() {
+  clearTimeout(walk);
+  walk = 0;
+}
+function tapCell(cell: number) {
+  if (!run || run.over || run.watching || cell < 0) return;
+  stopWalk();
+  const g = screen.sim.grid;
+  const at = screen.shown.cell;
+  const dx = (cell % g.w) - (at % g.w);
+  const dy = Math.floor(cell / g.w) - Math.floor(at / g.w);
+  if (Math.abs(dx) + Math.abs(dy) === 1) {
+    moveGrid(dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0);
+    return;
+  }
+  if (cell === at) return;
+  const path = walkTo(g, screen.sim.raw, cell);
+  if (!path) {
+    sound.bump();
+    return;
+  }
+  let k = 0;
+  const next = () => {
+    if (k >= path.length || !moveGrid(path[k++])) return stopWalk();
+    walk = window.setTimeout(next, 150);
+  };
+  next();
 }
 
 function act(a: string) {
   if (!run) return;
+  stopWalk();
   if (a === 'back') {
     click();
     endRun(null);
@@ -200,6 +249,7 @@ function act(a: string) {
   }
   const prev = screen.shown;
   if (a === 'undo' && screen.sim.undo()) {
+    coach.on('undo');
     run.clean = false;
     present(prev, false);
   } else if (a === 'redo' && screen.sim.redo()) present(prev, true);
@@ -220,6 +270,8 @@ export function say(text: string, ms = 5000) {
   clearTimeout(tipTimer);
   tipTimer = window.setTimeout(() => tip.classList.add('gone'), ms);
 }
+
+const coach = new Coach((text, ms) => say(text, ms));
 
 /** Asks the solver (in the worker) for the way on from here; shows the next move as an arrow. */
 async function askHint() {
@@ -294,20 +346,26 @@ for (const pad of hud.querySelectorAll<HTMLElement>('[data-d]')) {
   pad.addEventListener('pointerup', up);
   pad.addEventListener('pointercancel', up);
 }
-let swipe: { x: number; y: number; id: number } | null = null;
+let swipe: { x: number; y: number; id: number; moved: boolean; t: number } | null = null;
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  swipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  swipe = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false, t: performance.now() };
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
   if (!swipe || e.pointerId !== swipe.id) return;
   const dx = e.clientX - swipe.x;
   const dy = e.clientY - swipe.y;
   if (Math.hypot(dx, dy) < 28) return;
+  swipe.moved = true;
   move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0);
   // Keep sliding the finger for more moves.
   swipe.x = e.clientX;
   swipe.y = e.clientY;
 });
-const endSwipe = () => (swipe = null);
-renderer.domElement.addEventListener('pointerup', endSwipe);
-renderer.domElement.addEventListener('pointercancel', endSwipe);
+renderer.domElement.addEventListener('pointerup', (e) => {
+  // A short press that didn't swipe is a tap on a cell.
+  if (swipe && e.pointerId === swipe.id && !swipe.moved && performance.now() - swipe.t < 450) tapCell(view.cellAt(e.clientX, e.clientY));
+  swipe = null;
+});
+renderer.domElement.addEventListener('pointercancel', () => (swipe = null));
+
+startGamepad({ playing: () => !!run, move, act });

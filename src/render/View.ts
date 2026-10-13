@@ -11,7 +11,7 @@ import { Post, type Quality } from './post';
 import { clock, iceShader, lavaShader } from './shaders';
 import { bake, plain, spikeGeometry } from './shapes';
 import { skyTexture } from './sky';
-import { CRATE_COLORS, Mechanics, dressCrate, tileColor } from './mechanics';
+import { CRATE_COLORS, Mechanics, dressCrate, symbolMesh, tileColor } from './mechanics';
 import { CRATE, crateModel, decorModel, goalModel, mat, playerModel, tileGeometry, wallModel } from './models';
 
 /** World height of one level (a crate's height, so a crate in a dip is flush with the floor). */
@@ -283,6 +283,11 @@ export class View {
         if (grid.goalColor[c]) {
           glow.color.set(CRATE_COLORS[grid.goalColor[c]]);
           glow.emissive.set(CRATE_COLORS[grid.goalColor[c]]);
+          const sym = symbolMesh(grid.goalColor[c] - 1, 0.13, 0xffffff, 0.9);
+          if (sym) {
+            sym.position.y = 0.03;
+            group.add(sym);
+          }
         }
         this.pos(c, grid.floor[c], group.position);
         this.world.add(group);
@@ -543,6 +548,24 @@ export class View {
       // The arrow's tip looks along -z: turn it to the direction.
       this.hintArrow.rotation.y = [0, -Math.PI / 2, Math.PI, Math.PI / 2][dir];
     }
+  }
+
+  private ray = new THREE.Raycaster();
+
+  /** The cell under a screen point (a floor tile, a wall top, a crate), or -1. */
+  cellAt(clientX: number, clientY: number): number {
+    const g = this.grid;
+    if (!g) return -1;
+    this.ray.setFromCamera(new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1), this.camera);
+    const hits = this.ray.intersectObjects([this.world, ...this.crates.map((c) => c.group)], true);
+    for (const h of hits) {
+      // A point just inside the surface hit, in the level's own space.
+      const p = this.root.worldToLocal(h.point.clone().addScaledVector(this.ray.ray.direction, 0.05));
+      const x = Math.round(p.x + (g.w - 1) / 2);
+      const y = Math.round(p.z + (g.h - 1) / 2);
+      if (x >= 0 && y >= 0 && x < g.w && y < g.h) return y * g.w + x;
+    }
+    return -1;
   }
 
   /** Turns the camera a quarter turn (dir ±1). */

@@ -1,0 +1,5 @@
+meadow-1     reachable 1  unreachable 3  steps 1
+meadow-5     reachable 12  unreachable 2  steps 29
+tundra-3     reachable 17  unreachable 3  steps 59
+forge-4      reachable 22  unreachable 5  steps 83
+clockwork-2  reachable 22  unreachable 1  steps 64

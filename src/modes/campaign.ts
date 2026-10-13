@@ -1,11 +1,41 @@
 import { LEVELS } from '../levels/levels';
 import { WORLDS } from '../levels/worlds';
 import type { LevelDef } from '../levels/types';
-import { click, map, newTrophies, par, screen, settings, sound, summary, view, worldIndex } from '../app/context';
+import { click, map, newTrophies, par, screen, settings, showLevel, sound, summary, view, worldIndex } from '../app/context';
 import { isUnlocked, isWorldOpen, loadProgress, saveResult, totalStars, worldGate, worldLevels, worldStars } from '../game/progress';
 import { starLimits, starsFor } from '../game/score';
 import { showWorlds } from '../ui/screens/worlds';
 import { play } from './run';
+import { KEYS as STORE, readJSON, writeJSON } from '../game/storage';
+import { h } from '../ui/dom';
+
+/** Before a new world's first level (after the Meadow): a card on what its mechanic does. Once. */
+async function introduce(level: LevelDef) {
+  const w = WORLDS.findIndex((x) => x.id === level.world);
+  if (w <= 0 || LEVELS.find((l) => l.world === level.world) !== level) return;
+  const seen = readJSON<string[]>(STORE.seen, []);
+  if (seen.includes(level.world)) return;
+  writeJSON(STORE.seen, [...seen, level.world]);
+  // The new world's island is already behind the card.
+  showLevel(level);
+  screen.mode = 'level';
+  view.idle = true;
+  const world = WORLDS[w];
+  const el = h(
+    'div',
+    'modal',
+    `<div class="card intro-card"><p class="intro-kicker">World ${w + 1} · new</p><h2>${world.name}</h2><p class="intro-mech">${world.mechanic}</p><p class="intro-tip">${level.tip}</p><div class="actions"><button class="big-btn primary" data-done>Let's go</button></div></div>`,
+  );
+  document.body.append(el);
+  await new Promise<void>((resolve) => {
+    el.onclick = (e) => {
+      if (!(e.target as HTMLElement).closest('[data-done]')) return;
+      click();
+      el.remove();
+      resolve();
+    };
+  });
+}
 
 /** A campaign level's label: its world and number. */
 export const campaignLabel = (level: LevelDef) => `${WORLDS.find((w) => w.id === level.world)?.name ?? ''} · ${LEVELS.filter((l) => l.world === level.world).indexOf(level) + 1}`;
@@ -14,6 +44,7 @@ export const campaignLabel = (level: LevelDef) => `${WORLDS.find((w) => w.id ===
 export async function levelFlow(index: number): Promise<number> {
   for (;;) {
     const level = LEVELS[index];
+    await introduce(level);
     const r = await play(level, campaignLabel(level), par(index), { ghost: loadProgress()[level.id]?.run });
     if (!r) return index;
     const { state: s, clean } = r;

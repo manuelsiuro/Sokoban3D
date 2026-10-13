@@ -23,6 +23,8 @@ export interface Settings {
   quality: Quality;
   /** Vibrate on pushes, goals and wins (phones). */
   haptics: boolean;
+  /** Shapes on colored crates, goals, plates and doors (for color blindness). */
+  symbols: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shake: true,
   quality: 'auto',
   haptics: true,
+  symbols: true,
 };
 
 export function loadSettings(): Settings {

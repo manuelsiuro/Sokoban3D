@@ -19,6 +19,62 @@ const PAIR = [0, 0xb983ff, 0x5fe3ff, 0xffd447, 0x8fd16a];
 
 type Pos = (cell: number, z: number, out?: THREE.Vector3) => THREE.Vector3;
 
+/**
+ * Shapes that tell colors apart without seeing hue (a setting): crate kinds 1–4 are a
+ * circle, triangle, square and star (on the crate's top and its goal); channels 1–3 a
+ * diamond, a plus and a ring (on plates and doors).
+ */
+export const symbols = { on: true };
+const SHAPES: ((s: THREE.Shape, r: number) => void)[] = [
+  (s, r) => s.absarc(0, 0, r, 0, Math.PI * 2, false),
+  (s, r) => poly(s, 3, r * 1.15, Math.PI / 2),
+  (s, r) => poly(s, 4, r * 1.2, Math.PI / 4),
+  (s, r) => star(s, 5, r * 1.2, r * 0.5),
+  (s, r) => poly(s, 4, r * 1.15, 0),
+  (s, r) => {
+    const w = r * 0.38;
+    const pts = [[w, r], [w, w], [r, w], [r, -w], [w, -w], [w, -r], [-w, -r], [-w, -w], [-r, -w], [-r, w], [-w, w], [-w, r]];
+    pts.forEach(([x, y], k) => (k ? s.lineTo(x, y) : s.moveTo(x, y)));
+  },
+  (s, r) => {
+    s.absarc(0, 0, r, 0, Math.PI * 2, false);
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, r * 0.55, 0, Math.PI * 2, true);
+    s.holes.push(hole);
+  },
+];
+function poly(s: THREE.Shape, n: number, r: number, a0: number) {
+  for (let k = 0; k < n; k++) {
+    const a = a0 + (k / n) * Math.PI * 2;
+    if (k) s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    else s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+}
+function star(s: THREE.Shape, n: number, r: number, inner: number) {
+  for (let k = 0; k < n * 2; k++) {
+    const a = Math.PI / 2 + (k / (n * 2)) * Math.PI * 2;
+    const rr = k % 2 ? inner : r;
+    if (k) s.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    else s.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+}
+const symbolGeo = new Map<string, THREE.BufferGeometry>();
+/** A flat symbol lying face up (index into SHAPES), or null when symbols are off. */
+export function symbolMesh(index: number, size: number, color = 0x1d2433, opacity = 0.7): THREE.Mesh | null {
+  if (!symbols.on || index < 0 || index >= SHAPES.length) return null;
+  const key = `${index}|${size}`;
+  let geo = symbolGeo.get(key);
+  if (!geo) {
+    const sh = new THREE.Shape();
+    SHAPES[index](sh, size);
+    geo = new THREE.ShapeGeometry(sh, 16).rotateX(-Math.PI / 2);
+    symbolGeo.set(key, geo);
+  }
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.renderOrder = 1;
+  return m;
+}
+
 const shadowed = <T extends THREE.Object3D>(o: T) => {
   o.traverse((m) => {
     if (m instanceof THREE.Mesh) {
@@ -80,6 +136,11 @@ export class Mechanics {
         top.position.y = 0.06;
         top.name = 'top';
         o.add(top);
+        const sym = symbolMesh(3 + g.param[c], 0.13);
+        if (sym) {
+          sym.position.y = 0.045;
+          top.add(sym);
+        }
         o.position.copy(at);
         this.plates.set(c, o);
         this.group.add(shadowed(o));
@@ -97,6 +158,13 @@ export class Mechanics {
           const b = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.9, 8), mat(ch, { metal: 0.5, rough: 0.35, emissive: ch, emissiveIntensity: 0.2 }));
           b.position.set(-0.3 + k * 0.2, 0.45, 0);
           bars.add(b);
+        }
+        for (const x of [-0.45, 0.45]) {
+          const sym = symbolMesh(3 + g.param[c], 0.07, ch, 1);
+          if (sym) {
+            sym.position.set(x, 1.005, 0);
+            o.add(sym);
+          }
         }
         o.add(bars);
         // Doors run across their corridor: turn them to face open floor.
@@ -300,6 +368,11 @@ export class Mechanics {
 export function dressCrate(group: THREE.Group, panels: THREE.MeshStandardMaterial, kind: number) {
   if (kind >= KIND.red && kind <= KIND.yellow) {
     panels.color.set(CRATE_COLORS[kind]);
+    const sym = symbolMesh(kind - 1, 0.17, 0xffffff, 0.85);
+    if (sym) {
+      sym.position.y = 0.445;
+      group.add(sym);
+    }
     return;
   }
   if (kind === KIND.mirrorSlash || kind === KIND.mirrorBack) {

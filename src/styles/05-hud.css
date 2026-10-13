@@ -253,3 +253,41 @@
 .hud.watching .hud-keys {
   display: none;
 }
+
+/* Tutorial prompts: the tip bubble, lit up and gently pulsing until the step is done. */
+.hud-tip.coach {
+  box-shadow: var(--shadow), inset 0 0 0 2px #5aa6f5, 0 0 0 0 rgba(90, 166, 245, 0.5);
+  animation: coach-pulse 1.8s var(--ease) infinite;
+}
+
+@keyframes coach-pulse {
+  50% {
+    box-shadow: var(--shadow), inset 0 0 0 2px #5aa6f5, 0 0 0 8px rgba(90, 166, 245, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-tip.coach {
+    animation: none;
+  }
+}
+
+/* A new world's first level: what its mechanic does. */
+.intro-card .intro-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.intro-card .intro-mech {
+  margin: 4px 0 6px;
+  font: 600 18px var(--font-display);
+}
+
+.intro-card .intro-tip {
+  margin: 0 0 4px;
+  line-height: 1.45;
+}
