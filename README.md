@@ -1,10 +1,43 @@
-# Cratelands
+<p align="center">
+  <img src="public/icon.svg" width="112" alt="Cratelands icon">
+</p>
 
-A modern Sokoban on small 3D floating islands: push crates onto the pads, across seven
-biomes that each add a mechanic (ice, sand pits and doors, heights, conveyors and lava,
-colors and lasers, flipping gates and teleporters), plus a world played by pulling.
-Live at https://manuelsiuro.github.io/Sokoban3D/ (installable, plays offline; English and French). Built from **web-game-starter**; the
-plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](docs/PLAYBOOK.md)**.
+<h1 align="center">Cratelands</h1>
+
+<p align="center">
+  <b>A cosy 3D Sokoban on floating islands.</b><br>
+  Push crates onto pads across seven biomes, each with its own twist, plus a world played by pulling and tiny round planets.
+</p>
+
+<p align="center">
+  <a href="https://manuelsiuro.github.io/Sokoban3D/"><b>▶&nbsp; Play it now in your browser</b></a><br>
+  <sub>Free · no install · works on phones · installable and plays offline · English and French</sub>
+</p>
+
+<p align="center">
+  <a href="https://manuelsiuro.github.io/Sokoban3D/"><img src="docs/screenshots/title.jpeg" alt="Cratelands title screen" width="860"></a>
+</p>
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/meadow.jpeg" alt="Meadow: classic pushing among hedges"><br><sub><b>Meadow</b>: the classic rules, in a hedge maze</sub></td>
+    <td><img src="docs/screenshots/tundra-night.jpeg" alt="Frozen Tundra at night under the aurora"><br><sub><b>Frozen Tundra</b>: ice slides, here at night under the aurora</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/crystal.jpeg" alt="Crystal Caverns with lasers and mirrors"><br><sub><b>Crystal Caverns</b>: colored crates, lasers and mirrors</sub></td>
+    <td><img src="docs/screenshots/forge.jpeg" alt="Volcanic Forge with conveyor belts"><br><sub><b>Volcanic Forge</b>: conveyors and lava, in falling ash</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/sky.jpeg" alt="Sky Islands with heights and stairs"><br><sub><b>Sky Islands</b>: heights, steps and stacked crates</sub></td>
+    <td><img src="docs/screenshots/clockwork.jpeg" alt="Clockwork Sanctum with a rainbow after rain"><br><sub><b>Clockwork Sanctum</b>: flipping gates and portals, a rainbow after the rain</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/planet-globe.jpeg" alt="A little cube planet"><br><sub><b>Planets</b>: walk or push off an edge onto the next face</sub></td>
+    <td align="center"><img src="docs/screenshots/phone-desert.jpeg" alt="Desert Ruins on a phone" width="220"><br><sub><b>On a phone</b>: swipe, tap to move, or use the d-pad</sub></td>
+  </tr>
+</table>
 
 ## What's in the game
 
@@ -12,6 +45,9 @@ plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](
   Tundra (ice), Desert Ruins (sand pits, plates and doors), Sky Islands (heights), Volcanic
   Forge (conveyors, lava), Crystal Caverns (colors, lasers and mirror crates), Clockwork
   Sanctum (gates that flip every move, teleporters). Every par is the solver's proven optimum.
+- **Day, night and weather**: an eight-minute day with sunsets, stars and a moonlit night,
+  fireflies and the aurora, rain with rainbows, snow, sandstorms and ash; the pusher carries a
+  lantern after dark (both can be turned off in the settings).
 - **World map** of floating islands; worlds open at 55% of the stars before them.
 - **Stars** against par, a no-undo badge, **hints** from the live solver, free undo/redo.
 - **Ghost** of your best run walks beside you; **Watch best** replays it.
@@ -29,6 +65,13 @@ plan is in **[docs/PLAN.md](docs/PLAN.md)**, the method in **[docs/PLAYBOOK.md](
 - **Polish**: bloom and soft shadows with quality tiers, level fly-ins and transitions, squash and
   stretch, screen shake, pooled particles, per-world atmosphere (clouds, snow, embers, motes),
   mixed audio with per-world reverb, vibration, tap-to-move, gamepads, color symbols, a tutorial.
+
+## How it's built
+
+Vite + TypeScript + Three.js, no game engine. The rules are a deterministic, turn-based
+simulation; levels are data, and a solver proves every level solvable and every par optimal.
+Built from **web-game-starter**; the design is in **[docs/PLAN.md](docs/PLAN.md)**, the method
+in **[docs/PLAYBOOK.md](docs/PLAYBOOK.md)**. Every push to `main` deploys to GitHub Pages.
 
 ## Commands
 
